@@ -147,12 +147,19 @@
         .logo {
             font-size: 4rem;
             font-weight: 900;
+            color: #7c3aed;
             background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple), var(--accent-pink));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            text-shadow: 0 0 60px rgba(67, 97, 238, 0.5);
+            text-shadow: none;
             animation: logoGlow 3s ease-in-out infinite;
+        }
+
+        @supports (-webkit-background-clip: text) {
+            .logo {
+                -webkit-text-fill-color: transparent;
+            }
         }
 
         @keyframes logoGlow {
