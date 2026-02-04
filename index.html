@@ -963,6 +963,8 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         }
 
         // Room Listener
+        let resultsShown = false; // لمنع عرض النتائج أكثر من مرة
+
         function listenToRoom() {
             database.ref('rooms/' + currentRoomId).on('value', async snap => {
                 if (!snap.exists()) { showToast('تم حذف الغرفة', 'error'); cleanup(); showScreen('welcome'); return; }
@@ -971,9 +973,26 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                 const countEl = document.getElementById('players-count');
                 if (countEl) countEl.textContent = `اللاعبون: ${count}/2`;
 
-                if (room.status === 'waiting' && count === 2 && isHost) setTimeout(startGame, 1000);
-                else if (room.status === 'playing') showGameScreen(room);
-                else if (room.status === 'finished') await showResultsScreen(room);
+                if (room.status === 'waiting' && count === 2 && isHost) {
+                    resultsShown = false; // إعادة ضبط عند بدء لعبة جديدة
+                    setTimeout(startGame, 1000);
+                }
+                else if (room.status === 'playing') {
+                    resultsShown = false; // إعادة ضبط
+                    showGameScreen(room);
+                }
+                else if (room.status === 'finished' && !resultsShown) {
+                    resultsShown = true;
+                    // أولاً: إرسال الإجابات الحالية للاعب (مهم للضيف!)
+                    await submitAnswers();
+                    // انتظر قليلاً لضمان مزامنة البيانات
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // إعادة قراءة البيانات المحدثة
+                    const freshSnap = await database.ref('rooms/' + currentRoomId).once('value');
+                    if (freshSnap.exists()) {
+                        await showResultsScreen(freshSnap.val());
+                    }
+                }
             });
         }
 
@@ -1052,6 +1071,7 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         async function playAgain() {
             if (!isHost) { showToast('فقط المضيف يمكنه بدء جولة جديدة', 'error'); return; }
             gameStarted = false; // إعادة ضبط المتغير للجولة الجديدة
+            resultsShown = false; // إعادة ضبط لعرض النتائج
             const snap = await database.ref('rooms/' + currentRoomId).once('value');
             const room = snap.val();
             const updates = { status: 'playing', letter: getRandomLetter(), timer: 60, stoppedBy: '' };
