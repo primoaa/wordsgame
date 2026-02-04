@@ -1,0 +1,1771 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحدي الحروف - اسم حيوان نبات جماد بلاد</title>
+    <meta name="description" content="لعبة اسم حيوان نبات جماد بلاد - العب مع أصدقائك أونلاين">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================
+           المتغيرات والإعدادات الأساسية
+           =========================== */
+        :root {
+            --primary-bg: #1a1a2e;
+            --secondary-bg: #16213e;
+            --accent-blue: #4361ee;
+            --accent-purple: #7209b7;
+            --accent-pink: #f72585;
+            --accent-green: #06d6a0;
+            --accent-red: #ef233c;
+            --accent-yellow: #ffd60a;
+            --accent-orange: #fb8500;
+            --text-white: #ffffff;
+            --text-gray: #a0a0a0;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --border-radius: 20px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Cairo', sans-serif;
+            background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 50%, #0f0f23 100%);
+            min-height: 100vh;
+            color: var(--text-white);
+            overflow-x: hidden;
+        }
+
+        /* ===========================
+           الخلفية المتحركة
+           =========================== */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background:
+                radial-gradient(circle at 20% 80%, rgba(67, 97, 238, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(114, 9, 183, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(247, 37, 133, 0.1) 0%, transparent 50%);
+            animation: bgFloat 20s ease-in-out infinite;
+        }
+
+        @keyframes bgFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            33% {
+                transform: translate(30px, -30px) rotate(120deg);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) rotate(240deg);
+            }
+        }
+
+        /* ===========================
+           الحاوية الرئيسية
+           =========================== */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===========================
+           الشاشات
+           =========================== */
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        .screen.active {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ===========================
+           شاشة الترحيب
+           =========================== */
+        #welcome-screen {
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            gap: 40px;
+        }
+
+        .logo-container {
+            position: relative;
+        }
+
+        .logo {
+            font-size: 4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple), var(--accent-pink));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 60px rgba(67, 97, 238, 0.5);
+            animation: logoGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes logoGlow {
+
+            0%,
+            100% {
+                filter: drop-shadow(0 0 20px rgba(67, 97, 238, 0.5));
+            }
+
+            50% {
+                filter: drop-shadow(0 0 40px rgba(247, 37, 133, 0.8));
+            }
+        }
+
+        .subtitle {
+            font-size: 1.5rem;
+            color: var(--text-gray);
+            margin-top: 10px;
+        }
+
+        .categories-preview {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .category-badge {
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            animation: badgePulse 2s ease-in-out infinite;
+        }
+
+        .category-badge:nth-child(1) {
+            background: var(--accent-red);
+            animation-delay: 0s;
+        }
+
+        .category-badge:nth-child(2) {
+            background: var(--accent-green);
+            animation-delay: 0.2s;
+        }
+
+        .category-badge:nth-child(3) {
+            background: #6c757d;
+            animation-delay: 0.4s;
+        }
+
+        .category-badge:nth-child(4) {
+            background: var(--accent-blue);
+            animation-delay: 0.6s;
+        }
+
+        .category-badge:nth-child(5) {
+            background: var(--accent-purple);
+            animation-delay: 0.8s;
+        }
+
+        @keyframes badgePulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .welcome-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* ===========================
+           الأزرار
+           =========================== */
+        .btn {
+            padding: 18px 40px;
+            border: none;
+            border-radius: 15px;
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+            box-shadow: 0 10px 30px rgba(67, 97, 238, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(67, 97, 238, 0.6);
+        }
+
+        .btn-secondary {
+            background: var(--glass-bg);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-3px);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, var(--accent-red), #d90429);
+            color: white;
+            box-shadow: 0 10px 30px rgba(239, 35, 60, 0.4);
+            font-size: 1.5rem;
+            padding: 20px 60px;
+        }
+
+        .btn-stop:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 40px rgba(239, 35, 60, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ===========================
+           شاشة إدارة الغرف
+           =========================== */
+        #room-screen {
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .room-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: var(--shadow);
+        }
+
+        .room-card h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-gray);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.1rem;
+            transition: var(--transition);
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px rgba(67, 97, 238, 0.3);
+        }
+
+        .input-group input::placeholder {
+            color: var(--text-gray);
+        }
+
+        .room-divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .room-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .room-divider span {
+            background: var(--secondary-bg);
+            padding: 0 20px;
+            position: relative;
+            color: var(--text-gray);
+        }
+
+        .room-info {
+            background: rgba(67, 97, 238, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .room-code {
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: 5px;
+            color: var(--accent-blue);
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: none;
+            color: var(--accent-blue);
+            cursor: pointer;
+            font-size: 1rem;
+            margin-top: 10px;
+            font-family: 'Cairo', sans-serif;
+        }
+
+        .copy-btn:hover {
+            text-decoration: underline;
+        }
+
+        /* ===========================
+           شاشة الانتظار
+           =========================== */
+        #waiting-screen {
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            text-align: center;
+        }
+
+        .waiting-animation {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .waiting-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            animation: waitingBounce 1.4s ease-in-out infinite;
+        }
+
+        .waiting-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .waiting-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes waitingBounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        .waiting-room-code {
+            font-size: 1.5rem;
+            color: var(--text-gray);
+        }
+
+        .waiting-room-code span {
+            color: var(--accent-blue);
+            font-weight: 700;
+        }
+
+        /* ===========================
+           شاشة اللعب
+           =========================== */
+        #game-screen {
+            gap: 20px;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .letter-display {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            padding: 20px 40px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .letter-label {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+
+        .current-letter {
+            font-size: 4rem;
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+        }
+
+        .timer-display {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            padding: 20px 40px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .timer-label {
+            font-size: 1rem;
+            color: var(--text-gray);
+        }
+
+        .timer-value {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: var(--accent-yellow);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timer-value.warning {
+            color: var(--accent-orange);
+            animation: timerPulse 0.5s ease-in-out infinite;
+        }
+
+        .timer-value.danger {
+            color: var(--accent-red);
+            animation: timerPulse 0.3s ease-in-out infinite;
+        }
+
+        @keyframes timerPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        /* ===========================
+           بطاقات التصنيفات
+           =========================== */
+        .categories-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .category-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: var(--transition);
+        }
+
+        .category-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .category-header {
+            padding: 15px;
+            text-align: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .category-card:nth-child(1) .category-header {
+            background: var(--accent-red);
+        }
+
+        .category-card:nth-child(2) .category-header {
+            background: var(--accent-green);
+        }
+
+        .category-card:nth-child(3) .category-header {
+            background: #6c757d;
+        }
+
+        .category-card:nth-child(4) .category-header {
+            background: var(--accent-blue);
+        }
+
+        .category-card:nth-child(5) .category-header {
+            background: var(--accent-purple);
+        }
+
+        .category-body {
+            padding: 20px;
+        }
+
+        .category-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-family: 'Cairo', sans-serif;
+            font-size: 1.2rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .category-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 20px rgba(67, 97, 238, 0.3);
+        }
+
+        .category-input:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .category-input::placeholder {
+            color: var(--text-gray);
+            font-size: 3rem;
+        }
+
+        .game-actions {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        /* ===========================
+           شاشة النتائج
+           =========================== */
+        #results-screen {
+            align-items: center;
+            gap: 30px;
+            padding: 40px 20px;
+        }
+
+        .results-title {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .results-container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .player-results {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin-bottom: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .player-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .player-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .player-score {
+            font-size: 2rem;
+            font-weight: 900;
+            color: var(--accent-yellow);
+        }
+
+        .answers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .answer-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .answer-category {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+            margin-bottom: 5px;
+        }
+
+        .answer-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .answer-value.correct {
+            color: var(--accent-green);
+        }
+
+        .answer-value.wrong {
+            color: var(--accent-red);
+        }
+
+        .answer-points {
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .answer-points.positive {
+            color: var(--accent-green);
+        }
+
+        .answer-points.zero {
+            color: var(--text-gray);
+        }
+
+        .winner-banner {
+            background: linear-gradient(135deg, var(--accent-yellow), var(--accent-orange));
+            color: var(--primary-bg);
+            padding: 20px 40px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 30px;
+            animation: winnerGlow 2s ease-in-out infinite;
+        }
+
+        @keyframes winnerGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 30px rgba(255, 214, 10, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 60px rgba(255, 214, 10, 0.8);
+            }
+        }
+
+        .results-actions {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* ===========================
+           رسائل التنبيه
+           =========================== */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            opacity: 0;
+            transition: var(--transition);
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.success {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+        }
+
+        .toast.error {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        /* ===========================
+           التجاوب مع الشاشات الصغيرة
+           =========================== */
+        @media (max-width: 768px) {
+            .logo {
+                font-size: 2.5rem;
+            }
+
+            .subtitle {
+                font-size: 1.1rem;
+            }
+
+            .category-badge {
+                padding: 8px 16px;
+                font-size: 0.9rem;
+            }
+
+            .btn {
+                padding: 15px 30px;
+                font-size: 1rem;
+            }
+
+            .current-letter {
+                font-size: 3rem;
+            }
+
+            .timer-value {
+                font-size: 2.5rem;
+            }
+
+            .game-header {
+                justify-content: center;
+            }
+
+            .categories-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .results-title {
+                font-size: 1.8rem;
+            }
+        }
+
+        /* ===========================
+           تأثيرات إضافية
+           =========================== */
+        .shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-10px);
+            }
+
+            75% {
+                transform: translateX(10px);
+            }
+        }
+
+        .pulse {
+            animation: pulse 0.3s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- الخلفية المتحركة -->
+    <div class="bg-animation"></div>
+
+    <div class="container">
+        <!-- ===========================
+             شاشة الترحيب
+             =========================== -->
+        <div id="welcome-screen" class="screen active">
+            <div class="logo-container">
+                <h1 class="logo">تحدي الحروف</h1>
+                <p class="subtitle">اللعبة الكلاسيكية بإصدار أونلاين</p>
+            </div>
+
+            <div class="categories-preview">
+                <span class="category-badge">اسم</span>
+                <span class="category-badge">نبات</span>
+                <span class="category-badge">جماد</span>
+                <span class="category-badge">حيوان</span>
+                <span class="category-badge">بلاد</span>
+            </div>
+
+            <div class="welcome-buttons">
+                <button class="btn btn-primary" id="create-room-btn">إنشاء غرفة جديدة</button>
+                <button class="btn btn-secondary" id="join-room-btn">الانضمام لغرفة</button>
+            </div>
+        </div>
+
+        <!-- ===========================
+             شاشة إدارة الغرف
+             =========================== -->
+        <div id="room-screen" class="screen">
+            <button class="btn btn-secondary" id="back-to-welcome" style="align-self: flex-start;">→ الرجوع</button>
+
+            <div class="room-card" id="create-room-card" style="display: none;">
+                <h2>🎮 إنشاء غرفة جديدة</h2>
+
+                <div class="input-group">
+                    <label>اسم اللاعب</label>
+                    <input type="text" id="create-player-name" placeholder="أدخل اسمك..." maxlength="20">
+                </div>
+
+                <button class="btn btn-primary" id="confirm-create-room" style="width: 100%;">إنشاء الغرفة</button>
+
+                <div class="room-info" id="created-room-info" style="display: none;">
+                    <p>كود الغرفة</p>
+                    <div class="room-code" id="room-code-display"></div>
+                    <button class="copy-btn" id="copy-room-code">📋 نسخ الكود</button>
+                </div>
+            </div>
+
+            <div class="room-card" id="join-room-card" style="display: none;">
+                <h2>🚪 الانضمام لغرفة</h2>
+
+                <div class="input-group">
+                    <label>اسم اللاعب</label>
+                    <input type="text" id="join-player-name" placeholder="أدخل اسمك..." maxlength="20">
+                </div>
+
+                <div class="input-group">
+                    <label>كود الغرفة</label>
+                    <input type="text" id="room-code-input" placeholder="أدخل كود الغرفة..." maxlength="6"
+                        style="text-transform: uppercase; letter-spacing: 3px; text-align: center;">
+                </div>
+
+                <button class="btn btn-primary" id="confirm-join-room" style="width: 100%;">انضمام</button>
+            </div>
+        </div>
+
+        <!-- ===========================
+             شاشة الانتظار
+             =========================== -->
+        <div id="waiting-screen" class="screen">
+            <h2>⏳ في انتظار اللاعب الآخر...</h2>
+
+            <div class="waiting-animation">
+                <div class="waiting-dot"></div>
+                <div class="waiting-dot"></div>
+                <div class="waiting-dot"></div>
+            </div>
+
+            <p class="waiting-room-code">كود الغرفة: <span id="waiting-room-code"></span></p>
+
+            <p id="players-count">اللاعبون: 1/2</p>
+
+            <button class="btn btn-secondary" id="leave-room-btn">مغادرة الغرفة</button>
+        </div>
+
+        <!-- ===========================
+             شاشة اللعب
+             =========================== -->
+        <div id="game-screen" class="screen">
+            <div class="game-header">
+                <div class="letter-display">
+                    <div class="letter-label">الحرف</div>
+                    <div class="current-letter" id="current-letter">أ</div>
+                </div>
+
+                <div class="timer-display">
+                    <div class="timer-label">الوقت المتبقي</div>
+                    <div class="timer-value" id="timer-value">60</div>
+                </div>
+            </div>
+
+            <div class="categories-grid">
+                <div class="category-card">
+                    <div class="category-header">اسم</div>
+                    <div class="category-body">
+                        <input type="text" class="category-input" id="input-name" placeholder="؟" data-category="name">
+                    </div>
+                </div>
+
+                <div class="category-card">
+                    <div class="category-header">نبات</div>
+                    <div class="category-body">
+                        <input type="text" class="category-input" id="input-plant" placeholder="؟"
+                            data-category="plant">
+                    </div>
+                </div>
+
+                <div class="category-card">
+                    <div class="category-header">جماد</div>
+                    <div class="category-body">
+                        <input type="text" class="category-input" id="input-object" placeholder="؟"
+                            data-category="object">
+                    </div>
+                </div>
+
+                <div class="category-card">
+                    <div class="category-header">حيوان</div>
+                    <div class="category-body">
+                        <input type="text" class="category-input" id="input-animal" placeholder="؟"
+                            data-category="animal">
+                    </div>
+                </div>
+
+                <div class="category-card">
+                    <div class="category-header">بلاد</div>
+                    <div class="category-body">
+                        <input type="text" class="category-input" id="input-country" placeholder="؟"
+                            data-category="country">
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-actions">
+                <button class="btn btn-stop" id="stop-btn">🛑 STOP</button>
+            </div>
+        </div>
+
+        <!-- ===========================
+             شاشة النتائج
+             =========================== -->
+        <div id="results-screen" class="screen">
+            <h2 class="results-title">🏆 النتائج</h2>
+
+            <div class="winner-banner" id="winner-banner"></div>
+
+            <div class="results-container" id="results-container">
+                <!-- النتائج ستُضاف هنا ديناميكياً -->
+            </div>
+
+            <div class="results-actions">
+                <button class="btn btn-primary" id="play-again-btn">🔄 جولة جديدة</button>
+                <button class="btn btn-secondary" id="exit-game-btn">🚪 الخروج</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- رسائل التنبيه -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        // ===========================
+        // إعدادات Firebase
+        // ===========================
+        // ⚠️ قم بتغيير هذه الإعدادات بإعدادات مشروعك على Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAwdE4U_ycmvpPhUt1qh4IUGxB1bJgh5as",
+            authDomain: "word-game-7451f.firebaseapp.com",
+            databaseURL: "https://word-game-7451f-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "word-game-7451f",
+            storageBucket: "word-game-7451f.firebasestorage.app",
+            messagingSenderId: "824692932627",
+            appId: "1:824692932627:web:9250e379d5455a85ce3fe6",
+            measurementId: "G-K81TRJ1FN1"
+        };
+
+        // تهيئة Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // ===========================
+        // المتغيرات العامة
+        // ===========================
+        let currentRoomId = null;     // معرف الغرفة الحالية
+        let currentPlayerId = null;   // معرف اللاعب الحالي
+        let playerName = '';          // اسم اللاعب
+        let isHost = false;           // هل اللاعب هو المضيف
+        let gameTimer = null;         // مؤقت اللعبة
+        let roomListener = null;      // مستمع تغييرات الغرفة
+
+        // الحروف العربية التي يمكن اختيارها
+        const arabicLetters = [
+            'أ', 'ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز',
+            'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك',
+            'ل', 'م', 'ن', 'ه', 'و', 'ي'
+        ];
+
+        // التصنيفات
+        const categories = [
+            { id: 'name', label: 'اسم' },
+            { id: 'plant', label: 'نبات' },
+            { id: 'object', label: 'جماد' },
+            { id: 'animal', label: 'حيوان' },
+            { id: 'country', label: 'بلاد' }
+        ];
+
+        // ===========================
+        // عناصر DOM
+        // ===========================
+        const screens = {
+            welcome: document.getElementById('welcome-screen'),
+            room: document.getElementById('room-screen'),
+            waiting: document.getElementById('waiting-screen'),
+            game: document.getElementById('game-screen'),
+            results: document.getElementById('results-screen')
+        };
+
+        // ===========================
+        // دوال مساعدة
+        // ===========================
+
+        /**
+         * عرض شاشة معينة وإخفاء الباقي
+         */
+        function showScreen(screenName) {
+            Object.values(screens).forEach(screen => screen.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        /**
+         * عرض رسالة تنبيه
+         */
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        /**
+         * إنشاء كود غرفة عشوائي
+         */
+        function generateRoomCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        /**
+         * إنشاء معرف لاعب فريد
+         */
+        function generatePlayerId() {
+            return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        /**
+         * اختيار حرف عشوائي
+         */
+        function getRandomLetter() {
+            return arabicLetters[Math.floor(Math.random() * arabicLetters.length)];
+        }
+
+        /**
+         * تطبيع الحروف العربية
+         * تحويل أ، إ، آ إلى ا
+         */
+        function normalizeArabicLetter(letter) {
+            const normalizations = {
+                'أ': 'ا',
+                'إ': 'ا',
+                'آ': 'ا',
+                'ة': 'ه',
+                'ى': 'ي'
+            };
+            return normalizations[letter] || letter;
+        }
+
+        /**
+         * استخراج الحرف الأول من الكلمة
+         */
+        function getFirstLetter(word) {
+            if (!word || word.trim() === '') return '';
+            const trimmed = word.trim();
+            // تجاهل "ال" التعريف
+            if (trimmed.startsWith('ال') && trimmed.length > 2) {
+                return normalizeArabicLetter(trimmed.charAt(2));
+            }
+            return normalizeArabicLetter(trimmed.charAt(0));
+        }
+
+        /**
+         * التحقق من صحة الإجابة
+         */
+        function validateAnswer(answer, targetLetter) {
+            if (!answer || answer.trim() === '') return false;
+            const firstLetter = getFirstLetter(answer);
+            const normalizedTarget = normalizeArabicLetter(targetLetter);
+            return firstLetter === normalizedTarget;
+        }
+
+        /**
+         * حساب النقاط
+         */
+        function calculateScore(answers, letter) {
+            let score = 0;
+            const results = {};
+
+            categories.forEach(cat => {
+                const answer = answers[cat.id] || '';
+                const isValid = validateAnswer(answer, letter);
+                results[cat.id] = {
+                    answer: answer,
+                    valid: isValid,
+                    points: isValid ? 10 : 0
+                };
+                score += isValid ? 10 : 0;
+            });
+
+            return { score, results };
+        }
+
+        // ===========================
+        // دوال Firebase
+        // ===========================
+
+        /**
+         * إنشاء غرفة جديدة
+         */
+        async function createRoom(playerNameInput) {
+            const roomCode = generateRoomCode();
+            currentPlayerId = generatePlayerId();
+            playerName = playerNameInput;
+            isHost = true;
+
+            const roomData = {
+                code: roomCode,
+                status: 'waiting',
+                letter: '',
+                timer: 60,
+                stoppedBy: '',
+                createdAt: firebase.database.ServerValue.TIMESTAMP,
+                players: {
+                    [currentPlayerId]: {
+                        name: playerName,
+                        isHost: true,
+                        answers: {},
+                        score: 0
+                    }
+                }
+            };
+
+            try {
+                const roomRef = database.ref('rooms/' + roomCode);
+                await roomRef.set(roomData);
+                currentRoomId = roomCode;
+                return roomCode;
+            } catch (error) {
+                console.error('خطأ في إنشاء الغرفة:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * الانضمام لغرفة موجودة
+         */
+        async function joinRoom(roomCode, playerNameInput) {
+            currentPlayerId = generatePlayerId();
+            playerName = playerNameInput;
+            isHost = false;
+
+            try {
+                const roomRef = database.ref('rooms/' + roomCode);
+                const snapshot = await roomRef.once('value');
+
+                if (!snapshot.exists()) {
+                    throw new Error('الغرفة غير موجودة');
+                }
+
+                const roomData = snapshot.val();
+
+                if (roomData.status !== 'waiting') {
+                    throw new Error('اللعبة قد بدأت بالفعل');
+                }
+
+                const playersCount = Object.keys(roomData.players || {}).length;
+                if (playersCount >= 2) {
+                    throw new Error('الغرفة ممتلئة');
+                }
+
+                // إضافة اللاعب للغرفة
+                await roomRef.child('players/' + currentPlayerId).set({
+                    name: playerName,
+                    isHost: false,
+                    answers: {},
+                    score: 0
+                });
+
+                currentRoomId = roomCode;
+                return true;
+            } catch (error) {
+                console.error('خطأ في الانضمام:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * بدء اللعبة
+         */
+        async function startGame() {
+            if (!currentRoomId) return;
+
+            const letter = getRandomLetter();
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            await roomRef.update({
+                status: 'playing',
+                letter: letter,
+                timer: 60,
+                stoppedBy: ''
+            });
+        }
+
+        /**
+         * إرسال إجابات اللاعب
+         */
+        async function submitAnswers() {
+            if (!currentRoomId || !currentPlayerId) return;
+
+            const answers = {
+                name: document.getElementById('input-name').value.trim(),
+                plant: document.getElementById('input-plant').value.trim(),
+                object: document.getElementById('input-object').value.trim(),
+                animal: document.getElementById('input-animal').value.trim(),
+                country: document.getElementById('input-country').value.trim()
+            };
+
+            const playerRef = database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
+            await playerRef.update({ answers: answers });
+        }
+
+        /**
+         * الضغط على زر STOP
+         */
+        async function pressStop() {
+            if (!currentRoomId) return;
+
+            const roomRef = database.ref('rooms/' + currentRoomId);
+            await roomRef.update({
+                status: 'finished',
+                stoppedBy: playerName
+            });
+        }
+
+        /**
+         * مغادرة الغرفة
+         */
+        async function leaveRoom() {
+            if (!currentRoomId || !currentPlayerId) return;
+
+            try {
+                const playerRef = database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
+                await playerRef.remove();
+
+                // إذا كان المضيف، حذف الغرفة
+                if (isHost) {
+                    const roomRef = database.ref('rooms/' + currentRoomId);
+                    await roomRef.remove();
+                }
+            } catch (error) {
+                console.error('خطأ في مغادرة الغرفة:', error);
+            }
+
+            cleanup();
+        }
+
+        /**
+         * تنظيف الاتصالات والمتغيرات
+         */
+        function cleanup() {
+            if (roomListener) {
+                database.ref('rooms/' + currentRoomId).off('value', roomListener);
+                roomListener = null;
+            }
+            if (gameTimer) {
+                clearInterval(gameTimer);
+                gameTimer = null;
+            }
+            currentRoomId = null;
+            currentPlayerId = null;
+            isHost = false;
+        }
+
+        /**
+         * بدء جولة جديدة
+         */
+        async function playAgain() {
+            if (!currentRoomId) return;
+
+            // إعادة ضبط إجابات اللاعبين
+            const roomRef = database.ref('rooms/' + currentRoomId);
+            const snapshot = await roomRef.once('value');
+            const roomData = snapshot.val();
+
+            const updates = {
+                status: 'playing',
+                letter: getRandomLetter(),
+                timer: 60,
+                stoppedBy: ''
+            };
+
+            // إعادة ضبط إجابات جميع اللاعبين
+            for (const playerId of Object.keys(roomData.players || {})) {
+                updates[`players/${playerId}/answers`] = {};
+                updates[`players/${playerId}/score`] = 0;
+            }
+
+            await roomRef.update(updates);
+        }
+
+        // ===========================
+        // مستمع تغييرات الغرفة
+        // ===========================
+        function listenToRoom() {
+            if (!currentRoomId) return;
+
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            roomListener = roomRef.on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    showToast('تم حذف الغرفة', 'error');
+                    cleanup();
+                    showScreen('welcome');
+                    return;
+                }
+
+                const roomData = snapshot.val();
+                handleRoomUpdate(roomData);
+            });
+        }
+
+        /**
+         * معالجة تحديثات الغرفة
+         */
+        function handleRoomUpdate(roomData) {
+            const playersCount = Object.keys(roomData.players || {}).length;
+
+            // تحديث عدد اللاعبين في شاشة الانتظار
+            const playersCountEl = document.getElementById('players-count');
+            if (playersCountEl) {
+                playersCountEl.textContent = `اللاعبون: ${playersCount}/2`;
+            }
+
+            switch (roomData.status) {
+                case 'waiting':
+                    // إذا اكتمل عدد اللاعبين، المضيف يبدأ اللعبة
+                    if (playersCount === 2 && isHost) {
+                        setTimeout(() => startGame(), 1000);
+                    }
+                    break;
+
+                case 'playing':
+                    showGameScreen(roomData);
+                    break;
+
+                case 'finished':
+                    showResultsScreen(roomData);
+                    break;
+            }
+        }
+
+        /**
+         * عرض شاشة اللعب
+         */
+        function showGameScreen(roomData) {
+            showScreen('game');
+
+            // عرض الحرف
+            document.getElementById('current-letter').textContent = roomData.letter;
+
+            // تفعيل حقول الإدخال
+            document.querySelectorAll('.category-input').forEach(input => {
+                input.disabled = false;
+                input.value = '';
+            });
+
+            // تفعيل زر STOP
+            document.getElementById('stop-btn').disabled = false;
+
+            // بدء العداد التنازلي
+            startTimer(roomData.timer);
+        }
+
+        /**
+         * بدء العداد التنازلي
+         */
+        function startTimer(initialTime) {
+            if (gameTimer) clearInterval(gameTimer);
+
+            let timeLeft = initialTime;
+            const timerEl = document.getElementById('timer-value');
+            timerEl.textContent = timeLeft;
+            timerEl.className = 'timer-value';
+
+            gameTimer = setInterval(async () => {
+                timeLeft--;
+                timerEl.textContent = timeLeft;
+
+                // تغيير لون العداد حسب الوقت المتبقي
+                if (timeLeft <= 10) {
+                    timerEl.className = 'timer-value danger';
+                } else if (timeLeft <= 20) {
+                    timerEl.className = 'timer-value warning';
+                }
+
+                // تحديث الوقت في Firebase (المضيف فقط)
+                if (isHost && currentRoomId) {
+                    database.ref(`rooms/${currentRoomId}/timer`).set(timeLeft);
+                }
+
+                // انتهاء الوقت
+                if (timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    await submitAnswers();
+                    if (isHost) {
+                        await pressStop();
+                    }
+                }
+            }, 1000);
+        }
+
+        /**
+         * عرض شاشة النتائج
+         */
+        function showResultsScreen(roomData) {
+            if (gameTimer) {
+                clearInterval(gameTimer);
+                gameTimer = null;
+            }
+
+            // تعطيل حقول الإدخال
+            document.querySelectorAll('.category-input').forEach(input => {
+                input.disabled = true;
+            });
+            document.getElementById('stop-btn').disabled = true;
+
+            showScreen('results');
+
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+
+            const players = roomData.players || {};
+            const letter = roomData.letter;
+            const results = [];
+
+            // حساب النقاط لكل لاعب
+            for (const [playerId, playerData] of Object.entries(players)) {
+                const { score, results: answerResults } = calculateScore(playerData.answers || {}, letter);
+                results.push({
+                    id: playerId,
+                    name: playerData.name,
+                    score: score,
+                    answers: answerResults,
+                    isCurrentPlayer: playerId === currentPlayerId
+                });
+            }
+
+            // ترتيب حسب النقاط
+            results.sort((a, b) => b.score - a.score);
+
+            // عرض الفائز
+            const winnerBanner = document.getElementById('winner-banner');
+            if (results.length >= 2) {
+                if (results[0].score > results[1].score) {
+                    winnerBanner.textContent = `🎉 الفائز: ${results[0].name} بـ ${results[0].score} نقطة!`;
+                    winnerBanner.style.display = 'block';
+                } else if (results[0].score === results[1].score) {
+                    winnerBanner.textContent = '🤝 تعادل!';
+                    winnerBanner.style.display = 'block';
+                }
+            } else {
+                winnerBanner.style.display = 'none';
+            }
+
+            // عرض نتائج كل لاعب
+            results.forEach(player => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'player-results';
+                if (player.isCurrentPlayer) {
+                    playerDiv.style.borderColor = 'var(--accent-blue)';
+                }
+
+                let answersHTML = '';
+                categories.forEach(cat => {
+                    const answer = player.answers[cat.id] || { answer: '-', valid: false, points: 0 };
+                    answersHTML += `
+                        <div class="answer-item">
+                            <div class="answer-category">${cat.label}</div>
+                            <div class="answer-value ${answer.valid ? 'correct' : 'wrong'}">
+                                ${answer.answer || '-'}
+                            </div>
+                            <div class="answer-points ${answer.points > 0 ? 'positive' : 'zero'}">
+                                ${answer.points > 0 ? '+10' : '0'} نقطة
+                            </div>
+                        </div>
+                    `;
+                });
+
+                playerDiv.innerHTML = `
+                    <div class="player-header">
+                        <span class="player-name">${player.isCurrentPlayer ? '👤 ' : ''}${player.name}</span>
+                        <span class="player-score">${player.score} نقطة</span>
+                    </div>
+                    <div class="answers-grid">
+                        ${answersHTML}
+                    </div>
+                `;
+
+                container.appendChild(playerDiv);
+            });
+
+            // رسالة من أوقف اللعبة
+            if (roomData.stoppedBy) {
+                showToast(`${roomData.stoppedBy} ضغط STOP!`, 'success');
+            }
+        }
+
+        // ===========================
+        // أحداث DOM
+        // ===========================
+        document.addEventListener('DOMContentLoaded', () => {
+            // زر إنشاء غرفة
+            document.getElementById('create-room-btn').addEventListener('click', () => {
+                showScreen('room');
+                document.getElementById('create-room-card').style.display = 'block';
+                document.getElementById('join-room-card').style.display = 'none';
+            });
+
+            // زر الانضمام لغرفة
+            document.getElementById('join-room-btn').addEventListener('click', () => {
+                showScreen('room');
+                document.getElementById('create-room-card').style.display = 'none';
+                document.getElementById('join-room-card').style.display = 'block';
+            });
+
+            // زر الرجوع
+            document.getElementById('back-to-welcome').addEventListener('click', () => {
+                showScreen('welcome');
+            });
+
+            // تأكيد إنشاء الغرفة
+            document.getElementById('confirm-create-room').addEventListener('click', async () => {
+                const nameInput = document.getElementById('create-player-name');
+                const name = nameInput.value.trim();
+
+                if (!name) {
+                    showToast('الرجاء إدخال اسمك', 'error');
+                    nameInput.classList.add('shake');
+                    setTimeout(() => nameInput.classList.remove('shake'), 500);
+                    return;
+                }
+
+                try {
+                    const roomCode = await createRoom(name);
+                    document.getElementById('room-code-display').textContent = roomCode;
+                    document.getElementById('created-room-info').style.display = 'block';
+                    document.getElementById('waiting-room-code').textContent = roomCode;
+
+                    showScreen('waiting');
+                    listenToRoom();
+                    showToast('تم إنشاء الغرفة بنجاح!');
+                } catch (error) {
+                    showToast('حدث خطأ في إنشاء الغرفة', 'error');
+                }
+            });
+
+            // نسخ كود الغرفة
+            document.getElementById('copy-room-code').addEventListener('click', () => {
+                const code = document.getElementById('room-code-display').textContent;
+                navigator.clipboard.writeText(code).then(() => {
+                    showToast('تم نسخ الكود!');
+                });
+            });
+
+            // تأكيد الانضمام للغرفة
+            document.getElementById('confirm-join-room').addEventListener('click', async () => {
+                const nameInput = document.getElementById('join-player-name');
+                const codeInput = document.getElementById('room-code-input');
+                const name = nameInput.value.trim();
+                const code = codeInput.value.trim().toUpperCase();
+
+                if (!name) {
+                    showToast('الرجاء إدخال اسمك', 'error');
+                    nameInput.classList.add('shake');
+                    setTimeout(() => nameInput.classList.remove('shake'), 500);
+                    return;
+                }
+
+                if (!code) {
+                    showToast('الرجاء إدخال كود الغرفة', 'error');
+                    codeInput.classList.add('shake');
+                    setTimeout(() => codeInput.classList.remove('shake'), 500);
+                    return;
+                }
+
+                try {
+                    await joinRoom(code, name);
+                    document.getElementById('waiting-room-code').textContent = code;
+                    showScreen('waiting');
+                    listenToRoom();
+                    showToast('تم الانضمام بنجاح!');
+                } catch (error) {
+                    showToast(error.message, 'error');
+                }
+            });
+
+            // مغادرة الغرفة
+            document.getElementById('leave-room-btn').addEventListener('click', async () => {
+                await leaveRoom();
+                showScreen('welcome');
+            });
+
+            // زر STOP
+            document.getElementById('stop-btn').addEventListener('click', async () => {
+                await submitAnswers();
+                await pressStop();
+            });
+
+            // حفظ الإجابات عند الكتابة
+            document.querySelectorAll('.category-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    // تحديث الإجابات في الوقت الفعلي (اختياري)
+                    submitAnswers();
+                });
+            });
+
+            // جولة جديدة
+            document.getElementById('play-again-btn').addEventListener('click', async () => {
+                if (isHost) {
+                    await playAgain();
+                } else {
+                    showToast('فقط المضيف يمكنه بدء جولة جديدة', 'error');
+                }
+            });
+
+            // الخروج من اللعبة
+            document.getElementById('exit-game-btn').addEventListener('click', async () => {
+                await leaveRoom();
+                showScreen('welcome');
+            });
+        });
+
+        // تنظيف عند إغلاق الصفحة
+        window.addEventListener('beforeunload', () => {
+            if (currentRoomId && currentPlayerId) {
+                // إزالة اللاعب من الغرفة
+                const playerRef = database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
+                playerRef.remove();
+            }
+        });
+    </script>
+</body>
+
+</html>
