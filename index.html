@@ -1919,8 +1919,20 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         // Accept invite
         document.getElementById('accept-invite').onclick = async () => {
-            if (!currentInvite) return;
-            hideInviteModal();
+            if (!currentInvite || !currentInvite.roomId) {
+                showToast('الدعوة غير صالحة', 'error');
+                hideInviteModal();
+                return;
+            }
+
+            // حفظ البيانات قبل إخفاء النافذة
+            const inviteRoomId = currentInvite.roomId;
+            const inviteKey = currentInvite.key;
+
+            // إخفاء النافذة وحذف الدعوة
+            document.getElementById('invite-modal').classList.remove('show');
+            database.ref(`roomInvites/${myUserId}/${inviteKey}`).remove();
+            currentInvite = null;
 
             // Set player name if needed
             if (!myUserName) {
@@ -1928,8 +1940,8 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             }
 
             try {
-                await joinRoom(currentInvite.roomId, myUserName);
-                document.getElementById('waiting-room-code').textContent = currentInvite.roomId;
+                await joinRoom(inviteRoomId, myUserName);
+                document.getElementById('waiting-room-code').textContent = inviteRoomId;
                 showScreen('waiting');
                 listenToRoom();
                 showToast('تم الانضمام!');
@@ -1943,10 +1955,85 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             hideInviteModal();
         };
 
-        // Send invite to friend
+        // إنشاء غرفة وإرسال دعوة في نفس الوقت
+        async function createRoomAndInvite(friendId, friendName) {
+            // إذا لم يكن هناك اسم، اطلبه
+            if (!myUserName) {
+                const name = prompt('أدخل اسمك:');
+                if (!name || !name.trim()) {
+                    showToast('يجب إدخال اسمك أولاً', 'error');
+                    return;
+                }
+                initializeUser(name.trim());
+            }
+
+            try {
+                // إغلاق الـ sidebar
+                closeFriendsSidebar();
+
+                // إنشاء غرفة جديدة
+                showToast('جاري إنشاء الغرفة...');
+                await createRoom(myUserName);
+
+                // إرسال الدعوة
+                await database.ref(`roomInvites/${friendId}/${Date.now()}`).set({
+                    roomId: currentRoomId,
+                    from: myUserId,
+                    fromName: myUserName,
+                    timestamp: Date.now()
+                });
+
+                // عرض الغرفة
+                document.getElementById('waiting-room-code').textContent = currentRoomId;
+                showScreen('waiting');
+                listenToRoom();
+
+                // Show waiting modal
+                document.getElementById('invited-friend-name').textContent = friendName;
+                document.getElementById('invite-waiting-modal').classList.add('show');
+
+                let countdown = 30;
+                document.getElementById('invite-countdown').textContent = countdown;
+
+                inviteCountdownInterval = setInterval(() => {
+                    countdown--;
+                    document.getElementById('invite-countdown').textContent = countdown;
+                    if (countdown <= 0) {
+                        clearInterval(inviteCountdownInterval);
+                    }
+                }, 1000);
+
+                // Listen for room to become full
+                const roomRef = database.ref('rooms/' + currentRoomId);
+                const roomListener = roomRef.on('value', snap => {
+                    const room = snap.val();
+                    if (room && Object.keys(room.players || {}).length >= 2) {
+                        clearTimeout(inviteTimeout);
+                        clearInterval(inviteCountdownInterval);
+                        document.getElementById('invite-waiting-modal').classList.remove('show');
+                        roomRef.off('value', roomListener);
+                        showToast('انضم صديقك! 🎉');
+                    }
+                });
+
+                // Timeout
+                inviteTimeout = setTimeout(() => {
+                    clearInterval(inviteCountdownInterval);
+                    document.getElementById('invite-waiting-modal').classList.remove('show');
+                    roomRef.off('value', roomListener);
+                    showToast('يمكنك إرسال كود الغرفة يدوياً: ' + currentRoomId, 'error');
+                }, 30000);
+
+            } catch (error) {
+                showToast('حدث خطأ: ' + error.message, 'error');
+            }
+        }
+
+        // Send invite to friend (if already in a room)
         async function sendInviteToFriend(friendId, friendName) {
             if (!currentRoomId) {
-                showToast('أنشئ غرفة أولاً', 'error');
+                // إنشاء غرفة وإرسال دعوة
+                await createRoomAndInvite(friendId, friendName);
                 return;
             }
 
@@ -2430,7 +2517,7 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                         </div>
                         <div class="friend-actions">
                             <button class="btn-chat" onclick="openChat('${fid}', '${user.name}')" title="دردشة">💬</button>
-                            ${currentRoomId && user.online ?
+                            ${user.online ?
                         `<button class="btn-invite" onclick="sendInviteToFriend('${fid}', '${user.name}')" title="دعوة للعب">🎮</button>`
                         : ''}
                         </div>
