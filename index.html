@@ -1449,29 +1449,18 @@
             // دالة للتحقق الأساسي - يجب أن تبدأ الكلمة بالحرف الصحيح
             function basicValidation(answer, letter) {
                 const trimmed = answer.trim();
-                // يجب أن تكون الكلمة على الأقل حرفين
-                if (trimmed.length < MIN_WORD_LENGTH) {
-                    console.log(`Word "${trimmed}" too short (${trimmed.length} < ${MIN_WORD_LENGTH})`);
-                    return false;
-                }
-                // يجب أن تبدأ بالحرف الصحيح
+                if (trimmed.length < MIN_WORD_LENGTH) return false;
                 const firstLetter = getFirstLetter(trimmed);
                 const targetLetter = normalizeArabic(letter);
-                const matches = firstLetter === targetLetter;
-                console.log(`Letter check: "${trimmed}" starts with "${firstLetter}", target is "${targetLetter}" = ${matches}`);
-                return matches;
+                return firstLetter === targetLetter;
             }
 
             // تحديد ما إذا كان يوجد وسيلة للتحقق بالذكاء الاصطناعي
             const hasWorker = WORKER_URL && WORKER_URL.trim() !== "";
             const hasApiKey = GEMINI_API_KEY && GEMINI_API_KEY.trim() !== "";
 
-            console.log('🔍 AI Check - Worker URL:', WORKER_URL);
-            console.log('🔍 AI Check - hasWorker:', hasWorker, ', hasApiKey:', hasApiKey);
-
             // إذا لم يكن هناك Worker أو API Key، استخدم التحقق الأساسي
             if (!hasWorker && !hasApiKey) {
-                console.log('No AI available, using basic validation');
                 categories.forEach(cat => {
                     const answer = answers[cat.id] || '';
                     const isValid = basicValidation(answer, letter);
@@ -1517,7 +1506,6 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                 let text = '';
 
                 if (hasWorker) {
-                    console.log('Using Cloudflare Worker for AI verification');
                     response = await fetch(WORKER_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1525,7 +1513,6 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                     });
 
                     const data = await response.json();
-                    console.log('Worker response:', data);
 
                     // Worker يرجع النص مباشرة أو في candidates
                     if (data.candidates) {
@@ -1538,7 +1525,6 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                         text = JSON.stringify(data);
                     }
                 } else {
-                    console.log('Using direct Gemini API');
                     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1551,42 +1537,28 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                     text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 }
 
-                console.log('AI response text:', text);
                 const jsonMatch = text.match(/\{[\s\S]*\}/);
 
                 if (jsonMatch) {
                     const aiResults = JSON.parse(jsonMatch[0]);
-                    console.log('Parsed AI results:', aiResults);
 
                     categories.forEach(cat => {
                         const answer = answers[cat.id] || '';
                         const trimmedAnswer = answer.trim();
-
-                        // ✅ تحقق ثلاثي: 1) الطول 2) يبدأ بالحرف الصحيح 3) AI يوافق
                         const meetsMinLength = trimmedAnswer.length >= MIN_WORD_LENGTH;
                         const startsWithCorrectLetter = basicValidation(answer, letter);
                         const aiSaysValid = aiResults[cat.id]?.valid === true;
-
-                        // يجب أن تمر الثلاثة شروط
                         const isValid = meetsMinLength && startsWithCorrectLetter && aiSaysValid;
-
-                        console.log(`${cat.id}: "${answer}" - length:${meetsMinLength}, letter:${startsWithCorrectLetter}, AI:${aiSaysValid} = ${isValid}`);
-
                         results[cat.id] = { answer, valid: isValid, points: isValid ? 10 : 0 };
                         totalScore += isValid ? 10 : 0;
                     });
                     return { score: totalScore, results };
-                } else {
-                    console.error('❌ Could not find JSON in AI response');
-                    console.log('Raw text was:', text);
                 }
             } catch (error) {
-                console.error('❌ AI verification error:', error);
-                console.error('Error details:', error.message);
+                console.error('AI verification error:', error.message);
             }
 
-            // Fallback to basic verification (مع الحد الأدنى للطول)
-            console.log('Fallback to basic validation');
+            // Fallback to basic verification
             categories.forEach(cat => {
                 const answer = answers[cat.id] || '';
                 const isValid = basicValidation(answer, letter);
@@ -2272,13 +2244,9 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         // Open chat with friend
         function openChat(friendId, friendName) {
-            console.log('Opening chat with:', friendId, friendName);
-
             currentChatFriendId = friendId;
             currentChatFriendName = friendName;
             currentChatId = getChatId(myUserId, friendId);
-
-            console.log('Chat ID:', currentChatId);
 
             // Update header
             document.getElementById('chat-friend-name').textContent = friendName;
@@ -2297,7 +2265,6 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
             // Show panel
             document.getElementById('chat-panel').classList.remove('hidden');
-            console.log('Chat panel shown');
 
             // Close sidebar
             closeFriendsSidebar();
@@ -2475,102 +2442,12 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         // ==================== END CHAT SYSTEM ====================
 
-        // ==================== EXPOSE GLOBAL FUNCTIONS ====================
         // جعل الدوال متاحة للاستخدام من HTML
         window.openChat = openChat;
         window.sendInviteToFriend = sendInviteToFriend;
         window.acceptFriendRequest = acceptFriendRequest;
         window.rejectFriendRequest = rejectFriendRequest;
         window.sendFriendRequest = sendFriendRequest;
-
-        // ==================== TEST AI VERIFICATION ====================
-        // دالة اختبار التحقق بالذكاء الاصطناعي
-        // استخدمها في Console: testAI()
-        async function testAIVerification() {
-            console.log('🧪 بدء اختبار التحقق بالذكاء الاصطناعي...');
-            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-            // إجابات اختبارية - بعضها صحيح وبعضها خاطئ
-            const testAnswers = {
-                boyName: 'ضياء',      // ✅ صحيح - اسم ذكر يبدأ بـ ض
-                girlName: 'ضحى',      // ✅ صحيح - اسم أنثى يبدأ بـ ض
-                vegetable: 'ضحى',     // ❌ خاطئ - ضحى ليس خضار!
-                fruit: 'ض',           // ❌ خاطئ - حرف واحد
-                object: 'ضوء',        // ✅ صحيح - جماد يبدأ بـ ض
-                animal: 'ضفدع',       // ✅ صحيح - حيوان يبدأ بـ ض
-                country: 'صومال',     // ❌ خاطئ - يبدأ بـ ص وليس ض!
-                city: 'ضباء',         // ✅ صحيح - مدينة سعودية
-                job: 'ضابط'           // ✅ صحيح - مهنة تبدأ بـ ض
-            };
-
-            const testLetter = 'ض';
-
-            console.log('📝 الإجابات الاختبارية:');
-            console.log(testAnswers);
-            console.log('🔤 الحرف:', testLetter);
-            console.log('');
-
-            try {
-                const result = await verifyWithAI(testAnswers, testLetter);
-
-                console.log('');
-                console.log('📊 نتائج الاختبار:');
-                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-                const expected = {
-                    boyName: true,
-                    girlName: true,
-                    vegetable: false,  // ضحى ليس خضار
-                    fruit: false,      // حرف واحد
-                    object: true,
-                    animal: true,
-                    country: false,    // صومال يبدأ بـ ص
-                    city: true,
-                    job: true
-                };
-
-                let passed = 0;
-                let failed = 0;
-
-                for (const cat of categories) {
-                    const actual = result.results[cat.id]?.valid;
-                    const expect = expected[cat.id];
-                    const status = actual === expect ? '✅' : '❌';
-
-                    if (actual === expect) passed++;
-                    else failed++;
-
-                    console.log(`${status} ${cat.label}: "${testAnswers[cat.id]}" → ${actual ? 'صحيح' : 'خاطئ'} (المتوقع: ${expect ? 'صحيح' : 'خاطئ'})`);
-                }
-
-                console.log('');
-                console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-                console.log(`📈 النتيجة: ${passed}/${passed + failed} اختبارات ناجحة`);
-                console.log(`🏆 المجموع: ${result.score} نقطة`);
-
-                if (failed === 0) {
-                    console.log('🎉 التحقق بالذكاء الاصطناعي يعمل بشكل ممتاز!');
-                } else if (passed > failed) {
-                    console.log('⚠️ التحقق يعمل لكن يحتاج تحسين');
-                } else {
-                    console.log('❌ هناك مشكلة في التحقق!');
-                }
-
-                return result;
-            } catch (error) {
-                console.error('❌ خطأ في الاختبار:', error);
-                return null;
-            }
-        }
-
-        // اجعل دالة الاختبار متاحة
-        window.testAI = testAIVerification;
-
-        console.log('Game initialized successfully!');
-        console.log('User ID:', myUserId);
-        console.log('User Name:', myUserName || '(not set)');
-        console.log('');
-        console.log('💡 لاختبار الـ AI، اكتب في Console: testAI()');
     </script>
 </body>
 
