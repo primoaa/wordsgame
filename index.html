@@ -1466,6 +1466,9 @@
             const hasWorker = WORKER_URL && WORKER_URL.trim() !== "";
             const hasApiKey = GEMINI_API_KEY && GEMINI_API_KEY.trim() !== "";
 
+            console.log('🔍 AI Check - Worker URL:', WORKER_URL);
+            console.log('🔍 AI Check - hasWorker:', hasWorker, ', hasApiKey:', hasApiKey);
+
             // إذا لم يكن هناك Worker أو API Key، استخدم التحقق الأساسي
             if (!hasWorker && !hasApiKey) {
                 console.log('No AI available, using basic validation');
@@ -1573,9 +1576,13 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                         totalScore += isValid ? 10 : 0;
                     });
                     return { score: totalScore, results };
+                } else {
+                    console.error('❌ Could not find JSON in AI response');
+                    console.log('Raw text was:', text);
                 }
             } catch (error) {
-                console.error('AI verification error:', error);
+                console.error('❌ AI verification error:', error);
+                console.error('Error details:', error.message);
             }
 
             // Fallback to basic verification (مع الحد الأدنى للطول)
