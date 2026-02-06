@@ -23,6 +23,11 @@
             --text-gray: #a0a0a0;
             --glass-bg: rgba(255, 255, 255, 0.1);
             --border-radius: 20px;
+            /* Phase Colors */
+            --phase-speed: #4361ee;
+            --phase-accuracy: #06d6a0;
+            --phase-challenge: #f72585;
+            --phase-current: var(--accent-blue);
         }
 
         * {
@@ -36,6 +41,31 @@
             background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 50%, #0f0f23 100%);
             min-height: 100vh;
             color: var(--text-white);
+        }
+
+        /* Phase-based accent colors (Header, Borders, Accents only) */
+        body[data-phase="speed"] {
+            --phase-current: var(--phase-speed);
+        }
+
+        body[data-phase="accuracy"] {
+            --phase-current: var(--phase-accuracy);
+        }
+
+        body[data-phase="challenge"] {
+            --phase-current: var(--phase-challenge);
+        }
+
+        .phase-accent {
+            color: var(--phase-current);
+        }
+
+        .phase-accent-border {
+            border-color: var(--phase-current);
+        }
+
+        .phase-accent-bg {
+            background-color: var(--phase-current);
         }
 
         .container {
@@ -70,47 +100,294 @@
             }
         }
 
-        /* Welcome Screen */
+        /* Welcome Screen - New Design */
         #welcome-screen {
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             text-align: center;
-            gap: 40px;
+            gap: 25px;
+            padding: 20px;
+            padding-top: 40px;
+        }
+
+        .welcome-header {
+            margin-bottom: 10px;
         }
 
         .logo {
-            font-size: 3.5rem;
+            font-size: 2.8rem;
             font-weight: 900;
-            color: #a855f7;
-            text-shadow: 0 0 30px rgba(168, 85, 247, 0.6);
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+            filter: drop-shadow(0 4px 20px rgba(168, 85, 247, 0.4));
         }
 
         .subtitle {
-            font-size: 1.3rem;
+            font-size: 1rem;
             color: var(--text-gray);
-            margin-top: 10px;
+            margin-top: 8px;
+            letter-spacing: 2px;
         }
 
-        .categories-preview {
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--text-white);
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        /* Mode Selection */
+        .mode-selection {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .mode-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .mode-card {
+            background: linear-gradient(145deg, rgba(88, 28, 135, 0.8), rgba(107, 33, 168, 0.6));
+            border: 3px solid rgba(168, 85, 247, 0.3);
+            border-radius: 20px;
+            padding: 20px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mode-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.05) 100%);
+            pointer-events: none;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(168, 85, 247, 0.6);
+            box-shadow: 0 10px 40px rgba(168, 85, 247, 0.3);
+        }
+
+        .mode-card.selected {
+            border-color: #22c55e;
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.4);
+        }
+
+        .mode-card.selected .mode-card-check {
             display: flex;
-            gap: 10px;
+        }
+
+        .mode-card-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .mode-card-badge.new {
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(245, 158, 11, 0.8);
+            }
+        }
+
+        .mode-card-icon {
+            font-size: 3rem;
+            margin: 10px 0;
+        }
+
+        .mode-card-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 5px 0;
+        }
+
+        .mode-card-desc {
+            font-size: 0.8rem;
+            color: var(--text-gray);
+        }
+
+        .mode-card-check {
+            display: none;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 25px;
+            height: 25px;
+            background: #22c55e;
+            border-radius: 50%;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        /* Player Name Section */
+        .player-name-section {
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .input-group.compact {
+            margin: 0;
+        }
+
+        .input-group.compact label {
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .input-group.compact input {
+            padding: 14px 18px;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        /* Welcome Actions */
+        .welcome-actions {
+            display: flex;
+            gap: 15px;
             flex-wrap: wrap;
             justify-content: center;
-            margin: 20px 0;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .btn-large {
+            flex: 1;
+            min-width: 150px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-icon {
+            font-size: 1.3rem;
+        }
+
+        /* Categories Preview - Compact */
+        .categories-preview {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 10px;
+            opacity: 0.8;
         }
 
         .category-badge {
-            padding: 10px 20px;
+            padding: 6px 12px;
             border-radius: 50px;
-            font-weight: 700;
-            font-size: 0.95rem;
+            font-weight: 600;
+            font-size: 0.75rem;
         }
 
-        .welcome-buttons {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
+        /* Responsive */
+        @media (max-width: 480px) {
+            .logo {
+                font-size: 2.2rem;
+            }
+
+            .mode-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .mode-card {
+                padding: 15px 12px;
+            }
+
+            .mode-card-icon {
+                font-size: 2.5rem;
+            }
+
+            .welcome-actions {
+                flex-direction: column;
+            }
+
+            .btn-large {
+                width: 100%;
+            }
+
+            .categories-preview {
+                gap: 5px;
+            }
+
+            .category-badge {
+                padding: 4px 8px;
+                font-size: 0.65rem;
+            }
+        }
+
+        /* More responsive styles */
+        @media (max-width: 768px) {
+            .game-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .letter-display,
+            .timer-display {
+                padding: 12px 25px;
+            }
+
+            .current-letter {
+                font-size: 2.8rem;
+            }
+
+            .timer-value {
+                font-size: 2.5rem;
+            }
+
+            .categories-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+                gap: 8px;
+            }
+
+            .category-header {
+                padding: 8px;
+                font-size: 0.85rem;
+            }
+
+            .category-input {
+                padding: 10px;
+                font-size: 1.2rem;
+            }
+
+            .btn-stop {
+                padding: 14px 35px;
+                font-size: 1.2rem;
+            }
+
+            .phase-info {
+                padding: 8px 15px;
+            }
         }
 
         /* Buttons */
@@ -339,6 +616,41 @@
             }
         }
 
+        /* Phase Info Styles */
+        .phase-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 2px solid var(--phase-current);
+        }
+
+        .mode-name {
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .phase-dots {
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            color: var(--phase-current);
+        }
+
+        /* Locked STOP button */
+        .btn-stop.locked {
+            background: rgba(128, 128, 128, 0.3) !important;
+            color: rgba(255, 255, 255, 0.4) !important;
+            cursor: not-allowed;
+            border: 2px dashed rgba(255, 255, 255, 0.2) !important;
+        }
+
+        .btn-stop.locked::before {
+            content: '🔒 ';
+        }
+
         /* Categories Grid - 9 categories in 3 rows */
         .categories-grid {
             display: grid;
@@ -535,8 +847,60 @@
             margin-top: 4px;
         }
 
+        /* Results Screen */
+        .results-container {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .player-result-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .player-result-card.winner {
+            border-color: var(--accent-yellow);
+            background: linear-gradient(180deg, rgba(255, 214, 10, 0.1), rgba(0, 0, 0, 0.3));
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-player-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .result-total-score {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--accent-yellow);
+        }
+
         .answer-points.positive {
             color: var(--accent-green);
+        }
+
+        .winner-banner {
+            font-size: 1.5rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 15px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            color: var(--accent-yellow);
+            text-shadow: 0 0 20px rgba(255, 214, 10, 0.5);
         }
 
         .results-actions {
@@ -544,6 +908,8 @@
             gap: 15px;
             flex-wrap: wrap;
             justify-content: center;
+            width: 100%;
+            margin-top: 20px;
         }
 
         /* AI Verification Loading */
@@ -1262,15 +1628,62 @@
     </div>
 
     <div class="container">
-        <!-- Welcome Screen -->
+        <!-- Welcome Screen - New Design -->
         <div id="welcome-screen" class="screen active">
-            <div>
-                <h1 class="logo">تحدي الحروف</h1>
-                <p class="subtitle">اللعبة الكلاسيكية بإصدار أونلاين مع التحقق بالذكاء الاصطناعي</p>
+            <!-- Header -->
+            <div class="welcome-header">
+                <h1 class="logo">🎲 تحدي الحروف</h1>
+                <p class="subtitle">اسم · حيوان · نبات · جماد · بلاد</p>
             </div>
+
+            <!-- Mode Selection Cards -->
+            <div class="mode-selection">
+                <h2 class="section-title">🎮 اختر نمط اللعب</h2>
+                <div class="mode-cards">
+                    <!-- Classic Mode Card -->
+                    <div class="mode-card selected" data-mode="classic" onclick="selectMode('classic')">
+                        <div class="mode-card-badge">كلاسيكي</div>
+                        <div class="mode-card-icon">🎯</div>
+                        <div class="mode-card-title">1 ضد 1</div>
+                        <div class="mode-card-desc">60 ثانية للإجابة</div>
+                        <div class="mode-card-check">✓</div>
+                    </div>
+
+                    <!-- Multi-Phase Mode Card -->
+                    <div class="mode-card" data-mode="multiphase" onclick="selectMode('multiphase')">
+                        <div class="mode-card-badge new">جديد ⭐</div>
+                        <div class="mode-card-icon">⚡</div>
+                        <div class="mode-card-title">متعدد المراحل</div>
+                        <div class="mode-card-desc">سرعة + دقة + تحدي</div>
+                        <div class="mode-card-check">✓</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Player Name Input -->
+            <div class="player-name-section">
+                <div class="input-group compact">
+                    <label>👤 اسمك</label>
+                    <input type="text" id="player-name-input" placeholder="أدخل اسمك..." maxlength="20">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="welcome-actions">
+                <button class="btn btn-primary btn-large" id="create-room-btn">
+                    <span class="btn-icon">➕</span>
+                    <span>إنشاء غرفة</span>
+                </button>
+                <button class="btn btn-secondary btn-large" id="join-room-btn">
+                    <span class="btn-icon">🚪</span>
+                    <span>انضمام بكود</span>
+                </button>
+            </div>
+
+            <!-- Categories Preview -->
             <div class="categories-preview">
-                <span class="category-badge" style="background:var(--accent-red)">اسم ولد</span>
-                <span class="category-badge" style="background:var(--accent-pink)">اسم بنت</span>
+                <span class="category-badge" style="background:var(--accent-red)">ولد</span>
+                <span class="category-badge" style="background:var(--accent-pink)">بنت</span>
                 <span class="category-badge" style="background:var(--accent-green)">خضار</span>
                 <span class="category-badge" style="background:var(--accent-lime)">فواكه</span>
                 <span class="category-badge" style="background:#6c757d">جماد</span>
@@ -1278,10 +1691,6 @@
                 <span class="category-badge" style="background:var(--accent-purple)">بلاد</span>
                 <span class="category-badge" style="background:var(--accent-cyan)">مدينة</span>
                 <span class="category-badge" style="background:var(--accent-orange)">مهنة</span>
-            </div>
-            <div class="welcome-buttons">
-                <button class="btn btn-primary" id="create-room-btn">إنشاء غرفة جديدة</button>
-                <button class="btn btn-secondary" id="join-room-btn">الانضمام لغرفة</button>
             </div>
         </div>
 
@@ -1335,7 +1744,11 @@
             <div class="game-header">
                 <div class="letter-display">
                     <div class="letter-label">الحرف</div>
-                    <div class="current-letter" id="current-letter">أ</div>
+                    <div class="current-letter phase-accent-border" id="current-letter">أ</div>
+                </div>
+                <div id="phase-info" class="phase-info" style="display:none;">
+                    <span class="mode-name phase-accent"></span>
+                    <span class="phase-dots"></span>
                 </div>
                 <div class="timer-display">
                     <div class="timer-label">الوقت المتبقي</div>
@@ -1388,10 +1801,26 @@
         let currentRoomId = null, currentPlayerId = null, playerName = '', isHost = false;
         let gameTimerInterval = null, currentTimeLeft = 60;
         let currentRoundId = 0; // تتبع الجولة الحالية للتزامن
+        let currentPhase = null; // المرحلة الحالية (speed/accuracy/null للكلاسيكي)
+        let currentPhaseIndex = 0; // ترتيب المرحلة الحالية
         let roomListener = null; // حفظ مرجع الـ listener لإزالته لاحقاً
         let lastInviteTime = 0; // Rate limit على الدعوات
         const INVITE_COOLDOWN = 5000; // 5 ثواني بين الدعوات
-        let currentRoundStartAt = 0; // وقت بدء الجولة للـ anti-cheat
+        let currentPhaseStartAt = 0; // وقت بدء المرحلة للـ anti-cheat و timer
+
+        // تعريف المودات والمراحل
+        const MODES = {
+            classic: {
+                name: 'كلاسيكي',
+                phases: ['accuracy'],
+                durations: { accuracy: 60 }
+            },
+            multiphase: {
+                name: 'متعدد المراحل',
+                phases: ['speed', 'accuracy', 'challenge'],
+                durations: { speed: 20, accuracy: 30, challenge: 10 }
+            }
+        };
 
         // Categories Definition
         const categories = [
@@ -1431,6 +1860,35 @@
         function generateRoomCode() { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let r = ''; for (let i = 0; i < 6; i++) r += c[Math.floor(Math.random() * c.length)]; return r; }
         function generatePlayerId() { return 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6); }
         function getRandomLetter() { return arabicLetters[Math.floor(Math.random() * arabicLetters.length)]; }
+
+        // Mode selection
+        let selectedMode = 'classic';
+
+        function selectMode(mode) {
+            selectedMode = mode;
+            document.querySelectorAll('.mode-card').forEach(card => {
+                card.classList.toggle('selected', card.dataset.mode === mode);
+            });
+        }
+
+        // Phase helpers
+        function getPhaseLabel(phase) {
+            const labels = {
+                'speed': 'السرعة ⚡',
+                'accuracy': 'الدقة 🎯',
+                'challenge': 'التحدي 🔥'
+            };
+            return labels[phase] || 'كلاسيكي';
+        }
+
+        function generateProgressDots(currentIndex, total) {
+            let dots = '';
+            for (let i = 0; i < total; i++) {
+                dots += i <= currentIndex ? '●' : '○';
+                if (i < total - 1) dots += ' ';
+            }
+            return dots;
+        }
 
         function normalizeArabic(letter) {
             const n = { 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ة': 'ه', 'ى': 'ي' };
@@ -1575,25 +2033,38 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         }
 
         // Firebase Functions
-        async function createRoom(name) {
+        async function createRoom(name, mode = 'classic') {
             const code = generateRoomCode();
             currentPlayerId = generatePlayerId();
             playerName = name; isHost = true;
-            currentRoundId = 0; // إعادة ضبط
+            currentRoundId = 0;
+            currentPhase = null;
+            currentPhaseIndex = 0;
+
+            // الحصول على تعريف المود
+            const modeConfig = MODES[mode] || MODES.classic;
+
             await database.ref('rooms/' + code).set({
                 code,
                 status: 'waiting',
+                mode: mode,
+                modeName: modeConfig.name,
                 letter: '',
                 roundId: 0,
-                roundStartAt: null,
-                roundDuration: 60,
+                // مصفوفة المراحل
+                phases: modeConfig.phases,
+                phaseIndex: 0,
+                totalPhases: modeConfig.phases.length,
+                phase: null,
+                phaseStartAt: null,
+                phaseDuration: 60,
                 stoppedBy: '',
                 stopLock: false,
                 roundResults: null,
-                players: { [currentPlayerId]: { name, isHost: true, answers: {}, totalScore: 0 } }
+                players: { [currentPlayerId]: { name, isHost: true, answers: {}, totalScore: 0, phaseScores: {} } }
             });
             currentRoomId = code;
-            setupPresence(); // تتبع انقطاع الاتصال
+            setupPresence();
             return code;
         }
 
@@ -1606,29 +2077,46 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             currentPlayerId = generatePlayerId();
             playerName = name; isHost = false;
             currentRoundId = room.roundId || 0;
-            await database.ref(`rooms/${code}/players/${currentPlayerId}`).set({ name, isHost: false, answers: {}, totalScore: 0 });
+            currentPhase = room.phase || null;
+            currentPhaseIndex = room.phaseIndex || 0;
+            await database.ref(`rooms/${code}/players/${currentPlayerId}`).set({ name, isHost: false, answers: {}, totalScore: 0, phaseScores: {} });
             currentRoomId = code;
-            setupPresence(); // تتبع انقطاع الاتصال
+            setupPresence();
         }
 
         // تتبع انقطاع اتصال اللاعب
         function setupPresence() {
             if (!currentRoomId || !currentPlayerId) return;
             const playerRef = database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
-            // عند انقطاع الاتصال، حذف اللاعب تلقائياً
             playerRef.onDisconnect().remove();
         }
 
         async function startGame() {
             if (!currentRoomId || !isHost) return;
-            const newRoundId = (currentRoundId || 0) + 1;
+
+            // قراءة المود من الغرفة
+            const roomSnap = await database.ref('rooms/' + currentRoomId).once('value');
+            const room = roomSnap.val();
+            const mode = room.mode || 'classic';
+            const modeConfig = MODES[mode] || MODES.classic;
+
+            const newRoundId = (room.roundId || 0) + 1;
             currentRoundId = newRoundId;
+
+            // بدء من أول مرحلة
+            const firstPhase = modeConfig.phases[0];
+            const duration = modeConfig.durations[firstPhase] || 60;
+
             await database.ref('rooms/' + currentRoomId).update({
                 status: 'playing',
                 letter: getRandomLetter(),
                 roundId: newRoundId,
-                roundStartAt: firebase.database.ServerValue.TIMESTAMP,
-                roundDuration: 60,
+                phases: modeConfig.phases,
+                phaseIndex: 0,
+                totalPhases: modeConfig.phases.length,
+                phase: firstPhase,
+                phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
+                phaseDuration: duration,
                 stoppedBy: '',
                 stopLock: false,
                 roundResults: null
@@ -1649,9 +2137,20 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         async function pressStop() {
             if (!currentRoomId) return;
 
+            // Guard: STOP فقط في مرحلة accuracy
+            // speed = مخفي، challenge = مقفل
+            if (currentPhase && currentPhase !== 'accuracy') {
+                if (currentPhase === 'speed') {
+                    showToast('STOP غير متاح في مرحلة السرعة', 'error');
+                } else if (currentPhase === 'challenge') {
+                    showToast('STOP مقفل في مرحلة التحدي', 'error');
+                }
+                return;
+            }
+
             // Anti-cheat: لا يمكن الضغط على STOP قبل 5 ثواني
-            if (currentRoundStartAt > 0) {
-                const elapsed = (Date.now() - currentRoundStartAt) / 1000;
+            if (currentPhaseStartAt > 0) {
+                const elapsed = (Date.now() - currentPhaseStartAt) / 1000;
                 if (elapsed < 5) {
                     showToast('انتظر ' + Math.ceil(5 - elapsed) + ' ثواني', 'error');
                     return;
@@ -1668,9 +2167,9 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                 await roomRef.transaction((room) => {
                     if (!room) return room;
 
-                    // التحقق من الحالة والقفل - إذا سبق أحد لإنهاء الجولة
+                    // التحقق من الحالة والقفل
                     if (room.status !== 'playing' || room.stopLock) {
-                        return; // إلغاء العملية - أحد سبقك
+                        return; // أحد سبقك
                     }
 
                     room.status = 'finished';
@@ -1686,14 +2185,15 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         function cleanup() {
             if (gameTimerInterval) { clearInterval(gameTimerInterval); gameTimerInterval = null; }
-            // إزالة الـ listener بشكل صحيح
             if (roomListener && currentRoomId) {
                 database.ref('rooms/' + currentRoomId).off('value', roomListener);
                 roomListener = null;
             }
             currentRoomId = null; currentPlayerId = null; isHost = false;
             currentRoundId = 0;
-            currentRoundStartAt = 0;
+            currentPhase = null;
+            currentPhaseStartAt = 0;
+            lastDisplayedRoundId = 0;
         }
 
         async function leaveRoom() {
@@ -1775,17 +2275,65 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         async function handleTimeUp() {
             await submitAnswers();
 
+            // فقط المضيف يتحكم في الانتقال
             if (isHost) {
                 const roomRef = database.ref('rooms/' + currentRoomId);
-                try {
-                    await roomRef.transaction((room) => {
-                        if (!room || room.stopLock) return room;
-                        room.status = 'finished';
-                        room.stoppedBy = 'انتهى الوقت';
-                        room.stopLock = true;
-                        return room;
+                const roomSnap = await roomRef.once('value');
+                const room = roomSnap.val();
+
+                if (!room || room.stopLock) return;
+
+                const phases = room.phases || ['accuracy'];
+                const currentIdx = room.phaseIndex || 0;
+                const isLastPhase = currentIdx >= phases.length - 1;
+
+                if (isLastPhase) {
+                    // آخر مرحلة - إنهاء الجولة
+                    await roomRef.transaction((r) => {
+                        if (!r || r.stopLock) return r;
+                        r.status = 'finished';
+                        r.stoppedBy = 'انتهى الوقت';
+                        r.stopLock = true;
+                        return r;
                     });
-                } catch (e) { }
+                } else {
+                    // الانتقال للمرحلة التالية
+                    await nextPhase();
+                }
+            }
+        }
+
+        // الانتقال للمرحلة التالية (يستدعيها المضيف فقط)
+        async function nextPhase() {
+            if (!currentRoomId || !isHost) return;
+
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            try {
+                await roomRef.transaction((room) => {
+                    if (!room) return room;
+
+                    const phases = room.phases || ['accuracy'];
+                    const currentIdx = room.phaseIndex || 0;
+                    const nextIdx = currentIdx + 1;
+
+                    // guard
+                    if (nextIdx >= phases.length) return room;
+
+                    const nextPhaseName = phases[nextIdx];
+                    const modeConfig = MODES[room.mode] || MODES.classic;
+                    const duration = modeConfig.durations[nextPhaseName] || 60;
+
+                    room.phaseIndex = nextIdx;
+                    room.phase = nextPhaseName;
+                    room.phaseStartAt = firebase.database.ServerValue.TIMESTAMP;
+                    room.phaseDuration = duration;
+                    room.stopLock = false; // إعادة فتح STOP للمرحلة الجديدة
+
+                    return room;
+                });
+            } catch (e) {
+                console.error('Error transitioning phase:', e);
             }
         }
 
@@ -1804,6 +2352,10 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
                 const room = snap.val();
                 const roomRoundId = room.roundId || 0;
+                const roomPhaseIndex = room.phaseIndex || 0;
+
+                // تحديث data-phase على body للألوان
+                document.body.setAttribute('data-phase', room.phase || '');
 
                 // التحقق من تغيير المضيف
                 const myPlayerData = room.players?.[currentPlayerId];
@@ -1815,8 +2367,21 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
                 // جولة جديدة - إعادة ضبط الحالة المحلية
                 if (roomRoundId > currentRoundId) {
                     currentRoundId = roomRoundId;
-                    gameStarted = false;
+                    currentPhase = room.phase || null;
+                    currentPhaseIndex = 0;
                     resultsShown = false;
+                }
+
+                // تغيير المرحلة داخل نفس الجولة
+                if (roomPhaseIndex !== currentPhaseIndex && room.status === 'playing') {
+                    currentPhaseIndex = roomPhaseIndex;
+                    currentPhase = room.phase || null;
+                    // إعادة تشغيل المؤقت للمرحلة الجديدة
+                    if (gameTimerInterval) {
+                        clearInterval(gameTimerInterval);
+                        gameTimerInterval = null;
+                    }
+                    showToast(`🔄 مرحلة ${getPhaseLabel(room.phase)}`);
                 }
 
                 const count = Object.keys(room.players || {}).length;
@@ -1861,36 +2426,68 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             });
         }
 
-        let gameStarted = false;
+        // متغير لتتبع آخر جولة تم عرضها (بدلاً من gameStarted)
+        let lastDisplayedRoundId = 0;
 
         function showGameScreen(room) {
-            // جولة جديدة - إعادة ضبط
-            if (!screens.game.classList.contains('active')) {
-                gameStarted = false;
-            }
-
             showScreen('game');
             document.getElementById('current-letter').textContent = room.letter;
 
-            // أعد ضبط الحقول فقط عند بدء اللعبة لأول مرة
-            if (!gameStarted) {
+            // تحديث المرحلة المحلية
+            currentPhase = room.phase || null;
+            currentPhaseIndex = room.phaseIndex || 0;
+
+            // تحديث عنوان المود والمرحلة
+            const phaseInfo = document.getElementById('phase-info');
+            if (phaseInfo) {
+                const totalPhases = room.totalPhases || 1;
+                if (totalPhases > 1) {
+                    const dots = generateProgressDots(room.phaseIndex || 0, totalPhases);
+                    phaseInfo.innerHTML = `
+                        <span class="mode-name phase-accent">${room.modeName || MODES[room.mode]?.name || 'كلاسيكي'}</span>
+                        <span class="phase-dots">${dots}</span>
+                    `;
+                    phaseInfo.style.display = 'flex';
+                } else {
+                    phaseInfo.style.display = 'none';
+                }
+            }
+
+            // أعد ضبط الحقول فقط عند جولة جديدة
+            const roomRoundId = room.roundId || 0;
+            if (roomRoundId > lastDisplayedRoundId) {
+                lastDisplayedRoundId = roomRoundId;
                 document.querySelectorAll('.category-input').forEach(inp => {
                     inp.disabled = false;
                     inp.value = '';
                 });
-                gameStarted = true;
             }
 
-            document.getElementById('stop-btn').disabled = false;
+            // تحديث زر STOP حسب المرحلة
+            const stopBtn = document.getElementById('stop-btn');
+            if (room.phase === 'speed') {
+                // Speed: مخفي
+                stopBtn.style.display = 'none';
+            } else if (room.phase === 'challenge') {
+                // Challenge: مقفل
+                stopBtn.style.display = 'block';
+                stopBtn.disabled = true;
+                stopBtn.classList.add('locked');
+            } else {
+                // Accuracy أو كلاسيكي: ظاهر ومفعل
+                stopBtn.style.display = 'block';
+                stopBtn.disabled = false;
+                stopBtn.classList.remove('locked');
+            }
 
-            // حفظ وقت بدء الجولة للـ anti-cheat
-            if (room.roundStartAt) {
-                currentRoundStartAt = room.roundStartAt;
+            // حفظ وقت بدء المرحلة للـ anti-cheat
+            if (room.phaseStartAt) {
+                currentPhaseStartAt = room.phaseStartAt;
             }
 
             // استخدام وقت الخادم للمؤقت
-            if (!gameTimerInterval && room.roundStartAt) {
-                startTimer(room.roundStartAt, room.roundDuration || 60);
+            if (!gameTimerInterval && room.phaseStartAt) {
+                startTimer(room.phaseStartAt, room.phaseDuration || 60);
             }
         }
 
@@ -2001,38 +2598,50 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         }
 
         async function playAgain() {
-            if (!isHost) {
-                showToast('فقط المضيف يمكنه بدء جولة جديدة', 'error');
+            // السماح لكلا اللاعبين ببدء جولة جديدة
+            const roomRef = database.ref('rooms/' + currentRoomId);
+            const roomSnap = await roomRef.once('value');
+            const room = roomSnap.val();
+
+            if (!room) {
+                showToast('الغرفة غير موجودة', 'error');
                 return;
             }
 
-            const roomRef = database.ref('rooms/' + currentRoomId);
+            // قراءة المود من الغرفة
+            const mode = room.mode || 'classic';
+            const modeConfig = MODES[mode] || MODES.classic;
+            const firstPhase = modeConfig.phases[0];
+            const duration = modeConfig.durations[firstPhase] || 60;
 
             try {
-                await roomRef.transaction((room) => {
-                    if (!room) return room;
+                await roomRef.transaction((r) => {
+                    if (!r) return r;
 
-                    const newRoundId = (room.roundId || 0) + 1;
+                    const newRoundId = (r.roundId || 0) + 1;
 
-                    room.status = 'playing';
-                    room.roundId = newRoundId;
-                    room.letter = getRandomLetter();
-                    room.roundStartAt = firebase.database.ServerValue.TIMESTAMP;
-                    room.roundDuration = 60;
-                    room.stoppedBy = '';
-                    room.stopLock = false;
-                    room.roundResults = null;
+                    r.status = 'playing';
+                    r.roundId = newRoundId;
+                    r.letter = getRandomLetter();
+                    r.phases = modeConfig.phases;
+                    r.phaseIndex = 0;
+                    r.totalPhases = modeConfig.phases.length;
+                    r.phase = firstPhase;
+                    r.phaseStartAt = firebase.database.ServerValue.TIMESTAMP;
+                    r.phaseDuration = duration;
+                    r.stoppedBy = '';
+                    r.stopLock = false;
+                    r.roundResults = null;
 
                     // مسح الإجابات لكل لاعب
-                    for (const pid in room.players) {
-                        room.players[pid].answers = {};
+                    for (const pid in r.players) {
+                        r.players[pid].answers = {};
                     }
 
-                    return room;
+                    return r;
                 });
 
                 // إعادة ضبط المتغيرات المحلية
-                gameStarted = false;
                 resultsShown = false;
 
             } catch (e) {
@@ -2040,16 +2649,47 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             }
         }
 
-        // Event Listeners
-        document.getElementById('create-room-btn').onclick = () => { showScreen('room'); document.getElementById('create-room-card').style.display = 'block'; document.getElementById('join-room-card').style.display = 'none'; };
-        document.getElementById('join-room-btn').onclick = () => { showScreen('room'); document.getElementById('create-room-card').style.display = 'none'; document.getElementById('join-room-card').style.display = 'block'; };
+        // Event Listeners - New Design
+        document.getElementById('create-room-btn').onclick = async () => {
+            const name = document.getElementById('player-name-input').value.trim();
+            if (!name) { showToast('أدخل اسمك أولاً', 'error'); return; }
+            try {
+                const code = await createRoom(name, selectedMode);
+                document.getElementById('waiting-room-code').textContent = code;
+                showScreen('waiting');
+                listenToRoom();
+                showToast(`تم إنشاء الغرفة! 🎮 المود: ${MODES[selectedMode]?.name || 'كلاسيكي'}`);
+            } catch (e) { showToast('خطأ: ' + e.message, 'error'); }
+        };
+
+        document.getElementById('join-room-btn').onclick = () => {
+            const name = document.getElementById('player-name-input').value.trim();
+            if (!name) { showToast('أدخل اسمك أولاً', 'error'); return; }
+            // Show join modal
+            const code = prompt('أدخل كود الغرفة:');
+            if (code && code.trim()) {
+                joinRoomWithCode(name, code.trim().toUpperCase());
+            }
+        };
+
+        async function joinRoomWithCode(name, code) {
+            try {
+                await joinRoom(code, name);
+                document.getElementById('waiting-room-code').textContent = code;
+                showScreen('waiting');
+                listenToRoom();
+                showToast('تم الانضمام! 🚪');
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        // Old handlers for room screen (keep for compatibility)
         document.getElementById('back-to-welcome').onclick = () => showScreen('welcome');
 
         document.getElementById('confirm-create-room').onclick = async () => {
             const name = document.getElementById('create-player-name').value.trim();
             if (!name) { showToast('أدخل اسمك', 'error'); return; }
             try {
-                const code = await createRoom(name);
+                const code = await createRoom(name, selectedMode);
                 document.getElementById('room-code-display').textContent = code;
                 document.getElementById('created-room-info').style.display = 'block';
                 document.getElementById('waiting-room-code').textContent = code;
@@ -2227,6 +2867,12 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         // إنشاء غرفة وإرسال دعوة في نفس الوقت
         async function createRoomAndInvite(friendId, friendName) {
+            // منع الدعوات أثناء اللعب
+            if (currentRoomId) {
+                showToast('لا يمكن إرسال دعوة أثناء اللعب', 'error');
+                return;
+            }
+
             // Rate limit - منع الـ spam
             if (Date.now() - lastInviteTime < INVITE_COOLDOWN) {
                 const waitTime = Math.ceil((INVITE_COOLDOWN - (Date.now() - lastInviteTime)) / 1000);
@@ -2714,10 +3360,17 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
             const div = document.createElement('div');
             div.className = `chat-message ${isMe ? 'me' : 'friend'}`;
-            div.innerHTML = `
-                ${msg.text}
-                <span class="time">${time}</span>
-            `;
+
+            // إصلاح XSS - استخدام textContent بدلاً من innerHTML
+            const textSpan = document.createElement('span');
+            textSpan.textContent = msg.text;
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'time';
+            timeSpan.textContent = time;
+
+            div.appendChild(textSpan);
+            div.appendChild(timeSpan);
 
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
