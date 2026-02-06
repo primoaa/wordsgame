@@ -1387,6 +1387,11 @@
         // Game Variables
         let currentRoomId = null, currentPlayerId = null, playerName = '', isHost = false;
         let gameTimerInterval = null, currentTimeLeft = 60;
+        let currentRoundId = 0; // تتبع الجولة الحالية للتزامن
+        let roomListener = null; // حفظ مرجع الـ listener لإزالته لاحقاً
+        let lastInviteTime = 0; // Rate limit على الدعوات
+        const INVITE_COOLDOWN = 5000; // 5 ثواني بين الدعوات
+        let currentRoundStartAt = 0; // وقت بدء الجولة للـ anti-cheat
 
         // Categories Definition
         const categories = [
@@ -1401,7 +1406,8 @@
             { id: 'job', label: 'مهنة', class: 'cat-job', prompt: 'اسم مهنة/وظيفة' }
         ];
 
-        const arabicLetters = ['أ', 'ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
+        // الحروف العربية - إزالة 'أ' لأنها تُعامل مثل 'ا'
+        const arabicLetters = ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
 
         // Initialize categories UI
         function initCategoriesUI() {
@@ -1573,11 +1579,21 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             const code = generateRoomCode();
             currentPlayerId = generatePlayerId();
             playerName = name; isHost = true;
+            currentRoundId = 0; // إعادة ضبط
             await database.ref('rooms/' + code).set({
-                code, status: 'waiting', letter: '', timer: 60, stoppedBy: '',
-                players: { [currentPlayerId]: { name, isHost: true, answers: {}, score: 0 } }
+                code,
+                status: 'waiting',
+                letter: '',
+                roundId: 0,
+                roundStartAt: null,
+                roundDuration: 60,
+                stoppedBy: '',
+                stopLock: false,
+                roundResults: null,
+                players: { [currentPlayerId]: { name, isHost: true, answers: {}, totalScore: 0 } }
             });
             currentRoomId = code;
+            setupPresence(); // تتبع انقطاع الاتصال
             return code;
         }
 
@@ -1589,13 +1605,34 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             if (Object.keys(room.players || {}).length >= 2) throw new Error('الغرفة ممتلئة');
             currentPlayerId = generatePlayerId();
             playerName = name; isHost = false;
-            await database.ref(`rooms/${code}/players/${currentPlayerId}`).set({ name, isHost: false, answers: {}, score: 0 });
+            currentRoundId = room.roundId || 0;
+            await database.ref(`rooms/${code}/players/${currentPlayerId}`).set({ name, isHost: false, answers: {}, totalScore: 0 });
             currentRoomId = code;
+            setupPresence(); // تتبع انقطاع الاتصال
+        }
+
+        // تتبع انقطاع اتصال اللاعب
+        function setupPresence() {
+            if (!currentRoomId || !currentPlayerId) return;
+            const playerRef = database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`);
+            // عند انقطاع الاتصال، حذف اللاعب تلقائياً
+            playerRef.onDisconnect().remove();
         }
 
         async function startGame() {
             if (!currentRoomId || !isHost) return;
-            await database.ref('rooms/' + currentRoomId).update({ status: 'playing', letter: getRandomLetter(), timer: 60, stoppedBy: '' });
+            const newRoundId = (currentRoundId || 0) + 1;
+            currentRoundId = newRoundId;
+            await database.ref('rooms/' + currentRoomId).update({
+                status: 'playing',
+                letter: getRandomLetter(),
+                roundId: newRoundId,
+                roundStartAt: firebase.database.ServerValue.TIMESTAMP,
+                roundDuration: 60,
+                stoppedBy: '',
+                stopLock: false,
+                roundResults: null
+            });
         }
 
         function getAnswers() {
@@ -1611,86 +1648,223 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         async function pressStop() {
             if (!currentRoomId) return;
+
+            // Anti-cheat: لا يمكن الضغط على STOP قبل 5 ثواني
+            if (currentRoundStartAt > 0) {
+                const elapsed = (Date.now() - currentRoundStartAt) / 1000;
+                if (elapsed < 5) {
+                    showToast('انتظر ' + Math.ceil(5 - elapsed) + ' ثواني', 'error');
+                    return;
+                }
+            }
+
+            // أولاً: إرسال الإجابات
             await submitAnswers();
-            await database.ref('rooms/' + currentRoomId).update({ status: 'finished', stoppedBy: playerName });
+
+            // ثانياً: محاولة إنهاء الجولة مع قفل (transaction)
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            try {
+                await roomRef.transaction((room) => {
+                    if (!room) return room;
+
+                    // التحقق من الحالة والقفل - إذا سبق أحد لإنهاء الجولة
+                    if (room.status !== 'playing' || room.stopLock) {
+                        return; // إلغاء العملية - أحد سبقك
+                    }
+
+                    room.status = 'finished';
+                    room.stoppedBy = playerName;
+                    room.stopLock = true;
+
+                    return room;
+                });
+            } catch (e) {
+                // شخص آخر ضغط STOP أولاً
+            }
         }
 
         function cleanup() {
             if (gameTimerInterval) { clearInterval(gameTimerInterval); gameTimerInterval = null; }
-            if (currentRoomId) database.ref('rooms/' + currentRoomId).off();
+            // إزالة الـ listener بشكل صحيح
+            if (roomListener && currentRoomId) {
+                database.ref('rooms/' + currentRoomId).off('value', roomListener);
+                roomListener = null;
+            }
             currentRoomId = null; currentPlayerId = null; isHost = false;
+            currentRoundId = 0;
+            currentRoundStartAt = 0;
         }
 
         async function leaveRoom() {
-            if (currentRoomId && currentPlayerId) {
-                await database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`).remove();
-                if (isHost) await database.ref('rooms/' + currentRoomId).remove();
+            if (!currentRoomId || !currentPlayerId) {
+                cleanup();
+                showScreen('welcome');
+                return;
             }
+
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            try {
+                if (isHost) {
+                    // نقل الاستضافة للاعب الآخر أو حذف الغرفة
+                    await roomRef.transaction((room) => {
+                        if (!room) return room;
+
+                        // حذف اللاعب المضيف
+                        if (room.players && room.players[currentPlayerId]) {
+                            delete room.players[currentPlayerId];
+                        }
+
+                        const remainingPlayers = Object.keys(room.players || {});
+
+                        if (remainingPlayers.length === 0) {
+                            // لا يوجد لاعبون آخرون - حذف الغرفة
+                            return null;
+                        } else {
+                            // نقل الاستضافة للاعب الأول
+                            const newHostId = remainingPlayers[0];
+                            room.players[newHostId].isHost = true;
+                            room.status = 'waiting'; // إعادة للانتظار
+                            return room;
+                        }
+                    });
+                } else {
+                    // مجرد ضيف - حذف نفسه فقط
+                    await database.ref(`rooms/${currentRoomId}/players/${currentPlayerId}`).remove();
+                }
+            } catch (e) {
+                // تجاهل الأخطاء
+            }
+
             cleanup();
+            showScreen('welcome');
         }
 
-        // Timer
-        function startTimer(initial) {
+        // Timer - يعتمد على وقت الخادم للتزامن
+        function startTimer(roundStartAt, duration) {
             if (gameTimerInterval) clearInterval(gameTimerInterval);
-            currentTimeLeft = initial;
-            const timerEl = document.getElementById('timer-value');
-            timerEl.textContent = currentTimeLeft;
-            timerEl.className = 'timer-value';
 
-            gameTimerInterval = setInterval(async () => {
-                currentTimeLeft--;
-                timerEl.textContent = currentTimeLeft;
-                if (currentTimeLeft <= 10) timerEl.className = 'timer-value danger';
-                else if (currentTimeLeft <= 20) timerEl.className = 'timer-value warning';
+            const timerEl = document.getElementById('timer-value');
+
+            function updateTimer() {
+                const now = Date.now();
+                const elapsed = Math.floor((now - roundStartAt) / 1000);
+                const remaining = Math.max(0, duration - elapsed);
+
+                currentTimeLeft = remaining;
+                timerEl.textContent = remaining;
+
+                // تلوين
+                if (remaining <= 10) timerEl.className = 'timer-value danger';
+                else if (remaining <= 20) timerEl.className = 'timer-value warning';
                 else timerEl.className = 'timer-value';
 
-                if (currentTimeLeft <= 0) {
+                // انتهاء الوقت
+                if (remaining <= 0) {
                     clearInterval(gameTimerInterval);
                     gameTimerInterval = null;
-                    await submitAnswers();
-                    if (isHost) await database.ref('rooms/' + currentRoomId).update({ status: 'finished', stoppedBy: 'انتهى الوقت' });
+                    handleTimeUp();
                 }
-            }, 1000);
+            }
+
+            updateTimer(); // تحديث فوري
+            gameTimerInterval = setInterval(updateTimer, 1000);
+        }
+
+        async function handleTimeUp() {
+            await submitAnswers();
+
+            if (isHost) {
+                const roomRef = database.ref('rooms/' + currentRoomId);
+                try {
+                    await roomRef.transaction((room) => {
+                        if (!room || room.stopLock) return room;
+                        room.status = 'finished';
+                        room.stoppedBy = 'انتهى الوقت';
+                        room.stopLock = true;
+                        return room;
+                    });
+                } catch (e) { }
+            }
         }
 
         // Room Listener
-        let resultsShown = false; // لمنع عرض النتائج أكثر من مرة
+        let resultsShown = false;
 
         function listenToRoom() {
-            database.ref('rooms/' + currentRoomId).on('value', async snap => {
-                if (!snap.exists()) { showToast('تم حذف الغرفة', 'error'); cleanup(); showScreen('welcome'); return; }
+            // حفظ مرجع الـ listener لإزالته لاحقاً
+            roomListener = database.ref('rooms/' + currentRoomId).on('value', async snap => {
+                if (!snap.exists()) {
+                    showToast('تم حذف الغرفة', 'error');
+                    cleanup();
+                    showScreen('welcome');
+                    return;
+                }
+
                 const room = snap.val();
+                const roomRoundId = room.roundId || 0;
+
+                // التحقق من تغيير المضيف
+                const myPlayerData = room.players?.[currentPlayerId];
+                if (myPlayerData && myPlayerData.isHost && !isHost) {
+                    isHost = true;
+                    showToast('أصبحت المضيف الجديد! 👑');
+                }
+
+                // جولة جديدة - إعادة ضبط الحالة المحلية
+                if (roomRoundId > currentRoundId) {
+                    currentRoundId = roomRoundId;
+                    gameStarted = false;
+                    resultsShown = false;
+                }
+
                 const count = Object.keys(room.players || {}).length;
                 const countEl = document.getElementById('players-count');
                 if (countEl) countEl.textContent = `اللاعبون: ${count}/2`;
 
-                if (room.status === 'waiting' && count === 2 && isHost) {
-                    resultsShown = false; // إعادة ضبط عند بدء لعبة جديدة
-                    setTimeout(startGame, 1000);
-                }
-                else if (room.status === 'playing') {
-                    resultsShown = false; // إعادة ضبط
-                    showGameScreen(room);
-                }
-                else if (room.status === 'finished' && !resultsShown) {
-                    resultsShown = true;
-                    // أولاً: إرسال الإجابات الحالية للاعب (مهم للضيف!)
-                    await submitAnswers();
-                    // انتظر قليلاً لضمان مزامنة البيانات
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    // إعادة قراءة البيانات المحدثة
-                    const freshSnap = await database.ref('rooms/' + currentRoomId).once('value');
-                    if (freshSnap.exists()) {
-                        await showResultsScreen(freshSnap.val());
-                    }
+                // معالجة الحالات
+                switch (room.status) {
+                    case 'waiting':
+                        resultsShown = false;
+                        if (count === 2 && isHost) {
+                            setTimeout(() => startGame(), 1000);
+                        }
+                        break;
+
+                    case 'playing':
+                        showGameScreen(room);
+                        break;
+
+                    case 'finished':
+                        if (!resultsShown) {
+                            resultsShown = true;
+                            await submitAnswers();
+                            // انتظر قليلاً لضمان مزامنة الإجابات
+                            await new Promise(resolve => setTimeout(resolve, 800));
+                            // إعادة قراءة البيانات المحدثة
+                            const freshSnap = await database.ref('rooms/' + currentRoomId).once('value');
+                            if (freshSnap.exists()) {
+                                await showResultsScreen(freshSnap.val());
+                            }
+                        }
+                        break;
+
+                    case 'results':
+                        // حالة عرض النتائج (بعد حفظها من المضيف)
+                        if (!resultsShown) {
+                            resultsShown = true;
+                            await showResultsScreen(room);
+                        }
+                        break;
                 }
             });
         }
 
-        let gameStarted = false; // متغير لتتبع ما إذا بدأت اللعبة
+        let gameStarted = false;
 
         function showGameScreen(room) {
-            // إذا كانت الشاشة الحالية ليست شاشة اللعبة، أعد ضبط كل شيء
+            // جولة جديدة - إعادة ضبط
             if (!screens.game.classList.contains('active')) {
                 gameStarted = false;
             }
@@ -1708,7 +1882,16 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             }
 
             document.getElementById('stop-btn').disabled = false;
-            if (!gameTimerInterval) startTimer(room.timer || 60);
+
+            // حفظ وقت بدء الجولة للـ anti-cheat
+            if (room.roundStartAt) {
+                currentRoundStartAt = room.roundStartAt;
+            }
+
+            // استخدام وقت الخادم للمؤقت
+            if (!gameTimerInterval && room.roundStartAt) {
+                startTimer(room.roundStartAt, room.roundDuration || 60);
+            }
         }
 
         async function showResultsScreen(room) {
@@ -1720,22 +1903,80 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
             const container = document.getElementById('results-container');
             container.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>جاري التحقق من الإجابات...</p></div>';
 
-            const players = room.players || {};
-            const letter = room.letter;
+            // التحقق من وجود نتائج محفوظة
+            let roundResults = room.roundResults;
+
+            if (!roundResults && isHost) {
+                // المضيف ينفذ AI ويحفظ النتائج
+                roundResults = {};
+                const letter = room.letter;
+
+                for (const [pid, pdata] of Object.entries(room.players || {})) {
+                    const { score, results: ansResults } = await verifyWithAI(pdata.answers || {}, letter);
+                    roundResults[pid] = { score, answers: ansResults };
+                }
+
+                // حفظ النتائج في Firebase
+                await database.ref(`rooms/${currentRoomId}/roundResults`).set(roundResults);
+                await database.ref(`rooms/${currentRoomId}/status`).set('results');
+
+            } else if (!roundResults) {
+                // الضيف ينتظر نتائج المضيف
+                container.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>في انتظار نتائج التحقق...</p></div>';
+
+                // انتظار النتائج
+                return new Promise((resolve) => {
+                    const resultsListener = database.ref(`rooms/${currentRoomId}/roundResults`).on('value', (snap) => {
+                        if (snap.val()) {
+                            database.ref(`rooms/${currentRoomId}/roundResults`).off('value', resultsListener);
+                            displayResults(room, snap.val());
+                            resolve();
+                        }
+                    });
+
+                    // timeout بعد 30 ثانية
+                    setTimeout(() => {
+                        database.ref(`rooms/${currentRoomId}/roundResults`).off('value', resultsListener);
+                        container.innerHTML = '<p>حدث خطأ في التحقق</p>';
+                        resolve();
+                    }, 30000);
+                });
+            }
+
+            displayResults(room, roundResults);
+        }
+
+        function displayResults(room, roundResults) {
+            const container = document.getElementById('results-container');
             const results = [];
 
-            for (const [pid, pdata] of Object.entries(players)) {
-                const { score, results: ansResults } = await verifyWithAI(pdata.answers || {}, letter);
-                results.push({ id: pid, name: pdata.name, score, answers: ansResults, isMe: pid === currentPlayerId });
+            for (const [pid, pdata] of Object.entries(room.players || {})) {
+                const playerResults = roundResults?.[pid] || { score: 0, answers: {} };
+                results.push({
+                    id: pid,
+                    name: pdata.name,
+                    score: playerResults.score,
+                    answers: playerResults.answers,
+                    isMe: pid === currentPlayerId
+                });
             }
+
             results.sort((a, b) => b.score - a.score);
 
             const banner = document.getElementById('winner-banner');
             if (results.length >= 2) {
-                if (results[0].score > results[1].score) { banner.textContent = `🎉 الفائز: ${results[0].name} بـ ${results[0].score} نقطة!`; banner.style.display = 'block'; }
-                else if (results[0].score === results[1].score) { banner.textContent = '🤝 تعادل!'; banner.style.display = 'block'; }
-                else banner.style.display = 'none';
-            } else banner.style.display = 'none';
+                if (results[0].score > results[1].score) {
+                    banner.textContent = `🎉 الفائز: ${results[0].name} بـ ${results[0].score} نقطة!`;
+                    banner.style.display = 'block';
+                } else if (results[0].score === results[1].score) {
+                    banner.textContent = '🤝 تعادل!';
+                    banner.style.display = 'block';
+                } else {
+                    banner.style.display = 'none';
+                }
+            } else {
+                banner.style.display = 'none';
+            }
 
             container.innerHTML = results.map(p => `
                 <div class="player-results" style="${p.isMe ? 'border-color:var(--accent-blue);' : ''}">
@@ -1760,14 +2001,43 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
         }
 
         async function playAgain() {
-            if (!isHost) { showToast('فقط المضيف يمكنه بدء جولة جديدة', 'error'); return; }
-            gameStarted = false; // إعادة ضبط المتغير للجولة الجديدة
-            resultsShown = false; // إعادة ضبط لعرض النتائج
-            const snap = await database.ref('rooms/' + currentRoomId).once('value');
-            const room = snap.val();
-            const updates = { status: 'playing', letter: getRandomLetter(), timer: 60, stoppedBy: '' };
-            for (const pid of Object.keys(room.players || {})) { updates[`players/${pid}/answers`] = {}; updates[`players/${pid}/score`] = 0; }
-            await database.ref('rooms/' + currentRoomId).update(updates);
+            if (!isHost) {
+                showToast('فقط المضيف يمكنه بدء جولة جديدة', 'error');
+                return;
+            }
+
+            const roomRef = database.ref('rooms/' + currentRoomId);
+
+            try {
+                await roomRef.transaction((room) => {
+                    if (!room) return room;
+
+                    const newRoundId = (room.roundId || 0) + 1;
+
+                    room.status = 'playing';
+                    room.roundId = newRoundId;
+                    room.letter = getRandomLetter();
+                    room.roundStartAt = firebase.database.ServerValue.TIMESTAMP;
+                    room.roundDuration = 60;
+                    room.stoppedBy = '';
+                    room.stopLock = false;
+                    room.roundResults = null;
+
+                    // مسح الإجابات لكل لاعب
+                    for (const pid in room.players) {
+                        room.players[pid].answers = {};
+                    }
+
+                    return room;
+                });
+
+                // إعادة ضبط المتغيرات المحلية
+                gameStarted = false;
+                resultsShown = false;
+
+            } catch (e) {
+                showToast('حدث خطأ', 'error');
+            }
         }
 
         // Event Listeners
@@ -1957,6 +2227,14 @@ ${categories.map(cat => `- ${cat.prompt}: "${answers[cat.id] || 'فارغ'}"`).j
 
         // إنشاء غرفة وإرسال دعوة في نفس الوقت
         async function createRoomAndInvite(friendId, friendName) {
+            // Rate limit - منع الـ spam
+            if (Date.now() - lastInviteTime < INVITE_COOLDOWN) {
+                const waitTime = Math.ceil((INVITE_COOLDOWN - (Date.now() - lastInviteTime)) / 1000);
+                showToast('انتظر ' + waitTime + ' ثواني', 'error');
+                return;
+            }
+            lastInviteTime = Date.now();
+
             // إذا لم يكن هناك اسم، اطلبه
             if (!myUserName) {
                 const name = prompt('أدخل اسمك:');
