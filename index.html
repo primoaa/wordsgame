@@ -1523,10 +1523,136 @@
             align-items: center;
             justify-content: center;
         }
+
+        /* Debug Console Overlay */
+        #debug-console {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            overflow-y: auto;
+            z-index: 10000;
+            border-top: 2px solid #333;
+            display: none;
+            /* hidden by default, toggled via script or UI */
+            pointer-events: none;
+            /* Let clicks pass through if needed, but we might want interaction */
+            pointer-events: auto;
+        }
+
+        #debug-console .log-entry {
+            margin-bottom: 4px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 2px;
+        }
+
+        #debug-console .log-error {
+            color: #ff5555;
+        }
+
+        #debug-console .log-warn {
+            color: #ffb86c;
+        }
+
+        #debug-console .log-info {
+            color: #8be9fd;
+        }
+
+        #debug-console .log-time {
+            color: #6272a4;
+            margin-right: 5px;
+        }
+
+        #debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 10001;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: 1px solid white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 10px;
+            opacity: 0.5;
+        }
+
+        #debug-toggle:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Debug Console Elements -->
+    <div id="debug-console"></div>
+    <button id="debug-toggle" onclick="toggleDebugConsole()">🐞 Log</button>
+    <script>
+        // Debug Console Logic
+        (function () {
+            const consoleEl = document.getElementById('debug-console');
+            const originalLog = console.log;
+            const originalWarn = console.warn;
+            const originalError = console.error;
+
+            function formatTime() {
+                const now = new Date();
+                return now.toLocaleTimeString() + '.' + now.getMilliseconds();
+            }
+
+            function logToOverlay(type, args) {
+                if (!consoleEl) return;
+                const msg = Array.from(args).map(arg => {
+                    if (typeof arg === 'object') {
+                        try { return JSON.stringify(arg); } catch (e) { return String(arg); }
+                    }
+                    return String(arg);
+                }).join(' ');
+
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                entry.innerHTML = `<span class="log-time">[${formatTime()}]</span> ${msg}`;
+                consoleEl.appendChild(entry);
+                consoleEl.scrollTop = consoleEl.scrollHeight;
+
+                // Limit logs to prevent memory issues
+                if (consoleEl.children.length > 200) {
+                    consoleEl.removeChild(consoleEl.firstChild);
+                }
+            }
+
+            console.log = function () { originalLog.apply(console, arguments); logToOverlay('info', arguments); };
+            console.warn = function () { originalWarn.apply(console, arguments); logToOverlay('warn', arguments); };
+            console.error = function () { originalError.apply(console, arguments); logToOverlay('error', arguments); };
+
+            window.toggleDebugConsole = function () {
+                if (consoleEl.style.display === 'none' || consoleEl.style.display === '') {
+                    consoleEl.style.display = 'block';
+                } else {
+                    consoleEl.style.display = 'none';
+                }
+            };
+
+            // Log global errors
+            window.onerror = function (msg, url, line, col, error) {
+                console.error(`Global Error: ${msg} at ${url}:${line}:${col}`, error);
+            };
+
+            // Log unhandled promise rejections
+            window.onunhandledrejection = function (event) {
+                console.error('Unhandled Promise Rejection:', event.reason);
+            };
+
+            console.log('Debug console initialized');
+        })();
+    </script>
     <!-- Friends Toggle Button -->
     <button class="friends-toggle" id="friends-toggle">
         👥
