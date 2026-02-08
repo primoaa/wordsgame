@@ -1,0 +1,812 @@
+/**
+ * 🎮 Mode-Specific Styles
+ * 🔴 Each mode has completely separate UI - NO SHARING
+ */
+
+/* ==================== SURVIVAL MODE ==================== */
+.survival-game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 70vh;
+    gap: 30px;
+    padding: 20px;
+}
+
+.survival-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+}
+
+.survival-timer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(239, 35, 60, 0.2);
+    padding: 15px 25px;
+    border-radius: 50px;
+    border: 2px solid #ef233c;
+}
+
+.survival-timer .timer-icon {
+    font-size: 1.5rem;
+}
+
+.survival-timer .timer-value {
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #ef233c;
+}
+
+.survival-streak {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 214, 10, 0.2);
+    padding: 12px 20px;
+    border-radius: 50px;
+    border: 2px solid #ffd60a;
+}
+
+.survival-streak .streak-icon {
+    font-size: 1.3rem;
+}
+
+.survival-streak .streak-value {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #ffd60a;
+}
+
+.survival-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+}
+
+.survival-letter-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(135deg, #7209b7, #f72585);
+    padding: 20px 40px;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(114, 9, 183, 0.4);
+}
+
+.survival-letter-badge .letter-label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+.survival-letter-badge .letter-value {
+    font-size: 4rem;
+    font-weight: 900;
+}
+
+.survival-category-card {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 30px 50px;
+    border-radius: 25px;
+    text-align: center;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { border-color: rgba(255, 255, 255, 0.1); }
+    50% { border-color: rgba(255, 255, 255, 0.3); }
+}
+
+.survival-category-card .category-icon {
+    font-size: 4rem;
+    margin-bottom: 10px;
+}
+
+.survival-category-card .category-name {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.survival-input-container {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.survival-input {
+    flex: 1;
+    padding: 20px 25px;
+    font-size: 1.5rem;
+    font-family: 'Cairo', sans-serif;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.survival-input:focus {
+    outline: none;
+    border-color: #06d6a0;
+    background: rgba(6, 214, 160, 0.1);
+}
+
+.survival-submit-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #06d6a0, #00b4d8);
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.survival-submit-btn:hover {
+    transform: scale(1.1);
+}
+
+.survival-status {
+    margin-top: 20px;
+}
+
+.lives-indicator {
+    padding: 10px 25px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.lives-indicator.eliminated {
+    background: rgba(239, 35, 60, 0.3);
+    color: #ef233c;
+}
+
+/* Survival Results - different from classic */
+.survival-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.survival-elimination-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.elimination-card {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+}
+
+.elimination-card.alive {
+    border: 2px solid #06d6a0;
+}
+
+.elimination-card.dead {
+    border: 2px solid #ef233c;
+    opacity: 0.6;
+}
+
+/* ==================== MEMORY MODE ==================== */
+.memory-game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+    min-height: 70vh;
+}
+
+.memory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+.memory-game .phase-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 25px;
+    border-radius: 50px;
+    font-weight: 700;
+}
+
+.memory-game .phase-indicator.show-phase {
+    background: linear-gradient(135deg, #ffd60a, #fb8500);
+    color: #1a1a2e;
+}
+
+.memory-game .phase-indicator.recall-phase {
+    background: linear-gradient(135deg, #7209b7, #f72585);
+    color: white;
+}
+
+.memory-instruction {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: center;
+    padding: 15px 30px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+}
+
+.memory-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.memory-card {
+    background: linear-gradient(135deg, #4361ee, #7209b7);
+    padding: 25px 20px;
+    border-radius: 20px;
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 700;
+    box-shadow: 0 10px 30px rgba(67, 97, 238, 0.3);
+    animation: card-appear 0.5s ease forwards;
+    opacity: 0;
+    transform: scale(0.8);
+}
+
+@keyframes card-appear {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.memory-card.visible .memory-word {
+    opacity: 1;
+}
+
+.memory-card.hidden .memory-word {
+    filter: blur(10px);
+    user-select: none;
+}
+
+.memory-input-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.memory-input {
+    padding: 18px 15px;
+    font-size: 1.2rem;
+    font-family: 'Cairo', sans-serif;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    color: white;
+}
+
+.memory-input:focus {
+    outline: none;
+    border-color: #7209b7;
+}
+
+.memory-submit {
+    padding: 18px 50px;
+    font-size: 1.2rem;
+}
+
+/* ==================== BLUFF MODE ==================== */
+.bluff-game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+    min-height: 70vh;
+}
+
+.bluff-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+.bluff-game .phase-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 25px;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #f72585, #7209b7);
+    font-weight: 700;
+}
+
+.bluff-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.bluff-letter {
+    font-size: 1.5rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 15px 30px;
+    border-radius: 15px;
+}
+
+.bluff-category {
+    font-size: 2rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, #00b4d8, #4361ee);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.bluff-tip {
+    padding: 12px 25px;
+    background: rgba(247, 37, 133, 0.2);
+    border: 2px dashed #f72585;
+    border-radius: 15px;
+    color: #f72585;
+    font-weight: 600;
+}
+
+.bluff-input {
+    width: 100%;
+    padding: 20px;
+    font-size: 1.4rem;
+    font-family: 'Cairo', sans-serif;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    color: white;
+}
+
+.bluff-input:focus {
+    outline: none;
+    border-color: #f72585;
+}
+
+/* Voting Phase */
+.bluff-answers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+    max-width: 450px;
+}
+
+.bluff-answer-option {
+    position: relative;
+}
+
+.bluff-answer-option input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+}
+
+.bluff-answer-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 25px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.bluff-answer-option input:checked + .bluff-answer-card {
+    border-color: #f72585;
+    background: rgba(247, 37, 133, 0.2);
+}
+
+.bluff-answer-card:hover {
+    border-color: rgba(247, 37, 133, 0.5);
+}
+
+.answer-text {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.answer-player {
+    font-size: 0.9rem;
+    color: var(--text-gray);
+}
+
+.bluff-vote-btn {
+    padding: 18px 50px;
+    margin-top: 20px;
+}
+
+/* Reveal Phase */
+.bluff-reveals {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+}
+
+.reveal-card {
+    padding: 25px;
+    border-radius: 20px;
+    text-align: center;
+    animation: reveal-pop 0.5s ease;
+}
+
+@keyframes reveal-pop {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.reveal-card.honest {
+    background: rgba(6, 214, 160, 0.2);
+    border: 3px solid #06d6a0;
+}
+
+.reveal-card.liar {
+    background: rgba(239, 35, 60, 0.2);
+    border: 3px solid #ef233c;
+}
+
+.reveal-player {
+    font-size: 1.2rem;
+    font-weight: 700;
+    margin-bottom: 10px;
+}
+
+.reveal-answer {
+    font-size: 1.5rem;
+    font-weight: 900;
+    margin-bottom: 15px;
+}
+
+.reveal-status {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* ==================== OBJECTIVE MODE ==================== */
+.objective-game {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+    min-height: 70vh;
+}
+
+.objective-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 500px;
+}
+
+.objective-game .phase-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 25px;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #84cc16, #06d6a0);
+    font-weight: 700;
+    color: #1a1a2e;
+}
+
+.objective-card {
+    width: 100%;
+    max-width: 450px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 25px;
+    padding: 30px;
+    border: 3px solid rgba(132, 204, 22, 0.3);
+}
+
+.objective-title {
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 25px;
+    color: #84cc16;
+}
+
+.objective-constraints {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.constraint-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+}
+
+.constraint-icon {
+    font-size: 1.2rem;
+}
+
+.constraint-text {
+    flex: 1;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.constraint-status {
+    font-size: 1.5rem;
+}
+
+.constraint-status.pass {
+    color: #06d6a0;
+}
+
+.constraint-status.fail {
+    color: #ef233c;
+}
+
+.objective-input-area {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: 400px;
+}
+
+.objective-input {
+    padding: 22px 25px;
+    font-size: 1.6rem;
+    font-family: 'Cairo', sans-serif;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    color: white;
+}
+
+.objective-input:focus {
+    outline: none;
+    border-color: #84cc16;
+    background: rgba(132, 204, 22, 0.1);
+}
+
+.objective-submit {
+    padding: 18px;
+    font-size: 1.2rem;
+}
+
+/* ==================== MULTIPHASE MODE ==================== */
+.multiphase-game .phase-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 25px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 15px;
+    border: 2px solid;
+}
+
+.multiphase-game .phase-dots {
+    font-size: 1.3rem;
+    letter-spacing: 5px;
+}
+
+/* Speed Phase - Blue accent, no icons */
+.multiphase-game.phase-speed .categories-grid {
+    /* No validation icons */
+}
+
+.multiphase-game.phase-speed .category-card {
+    border-color: rgba(67, 97, 238, 0.3);
+}
+
+.multiphase-game.phase-speed .category-input:focus {
+    border-color: #4361ee;
+}
+
+/* Accuracy Phase - Green accent, with icons */
+.multiphase-game.phase-accuracy .validation-icon {
+    font-size: 1rem;
+    margin-right: 5px;
+}
+
+.multiphase-game.phase-accuracy .category-card {
+    border-color: rgba(6, 214, 160, 0.3);
+}
+
+.multiphase-game.phase-accuracy .category-input:focus {
+    border-color: #06d6a0;
+}
+
+/* Challenge Phase - Pink/Purple accent */
+.multiphase-game.phase-challenge {
+    /* Different layout */
+}
+
+.challenge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 25px;
+    padding: 30px;
+}
+
+.challenge-instruction {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #f72585;
+}
+
+.challenge-categories {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.challenge-category-btn {
+    padding: 20px 15px;
+    border: none;
+    border-radius: 15px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.challenge-category-btn:hover {
+    transform: scale(1.05);
+}
+
+.challenge-category-btn.selected {
+    box-shadow: 0 0 0 4px white, 0 0 0 6px currentColor;
+}
+
+/* Locked STOP button */
+.btn-stop.locked {
+    background: rgba(128, 128, 128, 0.3) !important;
+    color: rgba(255, 255, 255, 0.4) !important;
+    cursor: not-allowed;
+    border: 2px dashed rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ==================== MODE-SPECIFIC RESULTS ==================== */
+
+/* Survival Results - NO table */
+.survival-results-screen .results-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* Memory Results */
+.memory-results-screen .memory-score-card {
+    background: linear-gradient(135deg, #7209b7, #f72585);
+    padding: 30px;
+    border-radius: 25px;
+    text-align: center;
+}
+
+/* Bluff Results */
+.bluff-results-screen .bluff-winner {
+    animation: celebrate 1s ease infinite;
+}
+
+@keyframes celebrate {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+/* ==================== RESPONSIVE - BY MODE ==================== */
+
+@media (max-width: 768px) {
+    /* Survival */
+    .survival-letter-badge .letter-value {
+        font-size: 3rem;
+    }
+    
+    .survival-category-card {
+        padding: 25px 35px;
+    }
+    
+    .survival-category-card .category-icon {
+        font-size: 3rem;
+    }
+    
+    .survival-input {
+        font-size: 1.2rem;
+        padding: 15px 20px;
+    }
+    
+    /* Memory */
+    .memory-cards-container {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .memory-card {
+        padding: 20px 15px;
+        font-size: 1.1rem;
+    }
+    
+    /* Bluff */
+    .bluff-answer-card {
+        padding: 15px 20px;
+    }
+    
+    .answer-text {
+        font-size: 1.1rem;
+    }
+    
+    /* Objective */
+    .objective-card {
+        padding: 20px;
+    }
+    
+    .constraint-item {
+        padding: 12px 15px;
+    }
+    
+    /* Multiphase */
+    .challenge-categories {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    .survival-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .memory-cards-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .challenge-categories {
+        grid-template-columns: 1fr;
+    }
+}
