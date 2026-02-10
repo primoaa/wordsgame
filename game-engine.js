@@ -1306,6 +1306,92 @@ window.GameEngine = {
 
 // ==================== DRAGGABLE TIMER LOGIC ====================
 
+// Global Drag State
+const DragState = {
+    isDragging: false,
+    element: null,
+    startX: 0,
+    startY: 0,
+    initialLeft: 0,
+    initialTop: 0
+};
+
+// Global Move Handler
+const handleDragMove = (e) => {
+    if (!DragState.isDragging || !DragState.element) return;
+
+    if (e.cancelable) e.preventDefault(); // Stop scrolling
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    const deltaX = clientX - DragState.startX;
+    const deltaY = clientY - DragState.startY;
+
+    let newLeft = DragState.initialLeft + deltaX;
+    let newTop = DragState.initialTop + deltaY;
+
+    // Constraints
+    const timer = DragState.element;
+    const maxX = window.innerWidth - timer.offsetWidth;
+    const maxY = window.innerHeight - timer.offsetHeight;
+
+    newLeft = Math.max(0, Math.min(newLeft, maxX));
+    newTop = Math.max(0, Math.min(newTop, maxY));
+
+    timer.style.left = `${newLeft}px`;
+    timer.style.top = `${newTop}px`;
+};
+
+// Global End Handler
+const handleDragEnd = () => {
+    if (!DragState.isDragging || !DragState.element) return;
+
+    const timer = DragState.element;
+    DragState.isDragging = false;
+    DragState.element = null;
+
+    timer.style.cursor = 'grab';
+    timer.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+
+    // Save position
+    localStorage.setItem('timerPos', JSON.stringify({
+        x: timer.style.left,
+        y: timer.style.top
+    }));
+};
+
+// Start Handler (Attached to element)
+const handleDragStart = (e) => {
+    if (e.target.tagName === 'BUTTON') return;
+
+    const timer = e.currentTarget;
+    DragState.isDragging = true;
+    DragState.element = timer;
+
+    timer.style.cursor = 'grabbing';
+    timer.style.transition = 'none';
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    DragState.startX = clientX;
+    DragState.startY = clientY;
+
+    const rect = timer.getBoundingClientRect();
+    DragState.initialLeft = rect.left;
+    DragState.initialTop = rect.top;
+};
+
+// Attach Global Listeners (Once)
+if (!window.timerDragInitialized) {
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchend', handleDragEnd);
+    window.timerDragInitialized = true;
+}
+
 function setupDraggableTimer() {
     const timer = document.querySelector('.timer-display');
     if (!timer) return;
@@ -1315,10 +1401,11 @@ function setupDraggableTimer() {
     if (savedPos) {
         try {
             const { x, y } = JSON.parse(savedPos);
+            timer.style.position = 'fixed'; // Ensure it's fixed
             timer.style.left = x;
             timer.style.top = y;
-            // Ensure no reset via CSS
-            timer.style.transform = 'none';
+            timer.style.transform = 'none'; // Clear any centering transforms if present
+            timer.style.margin = '0';       // Clear margins
         } catch (e) {
             console.error('Error parsing timer position', e);
         }
@@ -1326,87 +1413,16 @@ function setupDraggableTimer() {
 
     // 2. Style
     timer.style.cursor = 'grab';
-    timer.style.touchAction = 'none'; // Prevent scrolling while dragging
+    timer.style.touchAction = 'none';
     timer.style.userSelect = 'none';
+    timer.style.zIndex = '9999'; // Ensure top z-index
 
-    // 3. Variables
-    let isDragging = false;
-    let startX, startY, initialLeft, initialTop;
+    // 3. Clean & Attach Listeners
+    timer.removeEventListener('mousedown', handleDragStart);
+    timer.addEventListener('mousedown', handleDragStart);
 
-    // 4. Mouse Down / Touch Start
-    const startDrag = (e) => {
-        // Allow clicking buttons inside if any (future proofing)
-        if (e.target.tagName === 'BUTTON') return;
-
-        isDragging = true;
-        timer.style.cursor = 'grabbing';
-        timer.style.transition = 'none'; // Disable transition for smooth drag
-
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        startX = clientX;
-        startY = clientY;
-
-        const rect = timer.getBoundingClientRect();
-        initialLeft = rect.left;
-        initialTop = rect.top;
-
-        // Prevent default touch actions (scrolling)
-        if (e.type === 'touchstart') {
-            // e.preventDefault(); // Sometimes needed, but can block click
-        }
-    };
-
-    // 5. Mouse Move / Touch Move
-    const moveDrag = (e) => {
-        if (!isDragging) return;
-
-        e.preventDefault(); // Stop scrolling on mobile!
-
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        const deltaX = clientX - startX;
-        const deltaY = clientY - startY;
-
-        let newLeft = initialLeft + deltaX;
-        let newTop = initialTop + deltaY;
-
-        // Constraints (Keep fully on screen)
-        const maxX = window.innerWidth - timer.offsetWidth;
-        const maxY = window.innerHeight - timer.offsetHeight;
-
-        newLeft = Math.max(0, Math.min(newLeft, maxX));
-        newTop = Math.max(0, Math.min(newTop, maxY));
-
-        timer.style.left = `${newLeft}px`;
-        timer.style.top = `${newTop}px`;
-    };
-
-    // 6. Mouse Up / Touch End
-    const endDrag = () => {
-        if (!isDragging) return;
-        isDragging = false;
-        timer.style.cursor = 'grab';
-        timer.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // Restore bounce
-
-        // Save position
-        localStorage.setItem('timerPos', JSON.stringify({
-            x: timer.style.left,
-            y: timer.style.top
-        }));
-    };
-
-    // Add Listeners
-    timer.addEventListener('mousedown', startDrag);
-    timer.addEventListener('touchstart', startDrag, { passive: false });
-
-    document.addEventListener('mousemove', moveDrag);
-    document.addEventListener('touchmove', moveDrag, { passive: false });
-
-    document.addEventListener('mouseup', endDrag);
-    document.addEventListener('touchend', endDrag);
+    timer.removeEventListener('touchstart', handleDragStart);
+    timer.addEventListener('touchstart', handleDragStart, { passive: false });
 }
 
 console.log('🎮 Game Engine loaded with modes:', Object.keys(GAME_MODES).join(', '));
