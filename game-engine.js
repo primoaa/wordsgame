@@ -1304,35 +1304,69 @@ window.GameEngine = {
     setupModeHandler
 };
 
-// ==================== DRAGGABLE TIMER LOGIC ====================
+// ==================== DRAGGABLE TIMER LOGIC (AUTO-DETECT) ====================
 
-// Global Drag State
+// Global State
 const DragState = {
     isDragging: false,
     element: null,
     startX: 0,
     startY: 0,
-    initialLeft: 0,
-    initialTop: 0
+    elemLeft: 0,
+    elemTop: 0
 };
 
-// Global Move Handler
-const handleDragMove = (e) => {
+// 1. Core Drag Handlers
+const onDragStart = (e) => {
+    // Ignore if clicking buttons/inputs inside
+    if (['BUTTON', 'INPUT'].includes(e.target.tagName)) return;
+
+    e.preventDefault(); // Stop default touch actions (scrolling)
+
+    const timer = e.currentTarget;
+    DragState.isDragging = true;
+    DragState.element = timer;
+
+    // Get input coordinates
+    const inputX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    const inputY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+
+    DragState.startX = inputX;
+    DragState.startY = inputY;
+
+    // Get current element position
+    // Use getBoundingClientRect for absolute screen position
+    const rect = timer.getBoundingClientRect();
+    DragState.elemLeft = rect.left;
+    DragState.elemTop = rect.top;
+
+    // Visual Feedback
+    timer.style.cursor = 'grabbing';
+    timer.style.transition = 'none'; // Essential for smooth drag
+    timer.style.zIndex = '99999';
+    timer.classList.add('dragging');
+
+    console.log('👆 Drag Start:', { x: inputX, y: inputY, elem: timer });
+};
+
+const onDragMove = (e) => {
     if (!DragState.isDragging || !DragState.element) return;
 
-    if (e.cancelable) e.preventDefault(); // Stop scrolling
+    e.preventDefault(); // Stop scrolling
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const inputX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+    const inputY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
 
-    const deltaX = clientX - DragState.startX;
-    const deltaY = clientY - DragState.startY;
+    const deltaX = inputX - DragState.startX;
+    const deltaY = inputY - DragState.startY;
 
-    let newLeft = DragState.initialLeft + deltaX;
-    let newTop = DragState.initialTop + deltaY;
-
-    // Constraints
     const timer = DragState.element;
+
+    // Calculate new position relative to viewport
+    let newLeft = DragState.elemLeft + deltaX;
+    let newTop = DragState.elemTop + deltaY;
+
+    // Boundary Constraints (Keep fully on screen)
     const maxX = window.innerWidth - timer.offsetWidth;
     const maxY = window.innerHeight - timer.offsetHeight;
 
@@ -1343,86 +1377,101 @@ const handleDragMove = (e) => {
     timer.style.top = `${newTop}px`;
 };
 
-// Global End Handler
-const handleDragEnd = () => {
+const onDragEnd = () => {
     if (!DragState.isDragging || !DragState.element) return;
 
     const timer = DragState.element;
     DragState.isDragging = false;
     DragState.element = null;
 
+    // Reset styles
     timer.style.cursor = 'grab';
-    timer.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    timer.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // Restore bounce
+    timer.classList.remove('dragging');
 
-    // Save position
+    // Persist Position
     localStorage.setItem('timerPos', JSON.stringify({
         x: timer.style.left,
         y: timer.style.top
     }));
+
+    console.log('👇 Drag End. Saved:', timer.style.left, timer.style.top);
 };
 
-// Start Handler (Attached to element)
-const handleDragStart = (e) => {
-    if (e.target.tagName === 'BUTTON') return;
 
-    const timer = e.currentTarget;
-    DragState.isDragging = true;
-    DragState.element = timer;
+// 2. Initialize a Timer Element
+function initDraggableElement(timer) {
+    if (timer.dataset.draggableInit) return; // Already done
 
-    timer.style.cursor = 'grabbing';
-    timer.style.transition = 'none';
-
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    DragState.startX = clientX;
-    DragState.startY = clientY;
-
-    const rect = timer.getBoundingClientRect();
-    DragState.initialLeft = rect.left;
-    DragState.initialTop = rect.top;
-};
-
-// Attach Global Listeners (Once)
-if (!window.timerDragInitialized) {
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('mouseup', handleDragEnd);
-    document.addEventListener('touchend', handleDragEnd);
-    window.timerDragInitialized = true;
-}
-
-function setupDraggableTimer() {
-    const timer = document.querySelector('.timer-display');
-    if (!timer) return;
-
-    // 1. Restore Position
+    // Restore saved position
     const savedPos = localStorage.getItem('timerPos');
     if (savedPos) {
         try {
             const { x, y } = JSON.parse(savedPos);
-            timer.style.position = 'fixed'; // Ensure it's fixed
+            timer.style.position = 'fixed';
             timer.style.left = x;
             timer.style.top = y;
-            timer.style.transform = 'none'; // Clear any centering transforms if present
-            timer.style.margin = '0';       // Clear margins
-        } catch (e) {
-            console.error('Error parsing timer position', e);
-        }
+            timer.style.margin = '0';
+            timer.style.transform = 'none';
+        } catch (e) { console.error('Pos load error', e); }
+    } else {
+        // Ensure defaults if no save
+        timer.style.position = 'fixed';
+        // Only set default if not set by CSS
+        // actually existing CSS sets top/left 20px
     }
 
-    // 2. Style
-    timer.style.cursor = 'grab';
-    timer.style.touchAction = 'none';
+    // Force styles for drag
+    timer.style.touchAction = 'none'; // Critical for mobile
     timer.style.userSelect = 'none';
-    timer.style.zIndex = '9999'; // Ensure top z-index
+    timer.style.cursor = 'grab';
+    timer.style.zIndex = '100000'; // Higher than modals
 
-    // 3. Clean & Attach Listeners
-    timer.removeEventListener('mousedown', handleDragStart);
-    timer.addEventListener('mousedown', handleDragStart);
+    // Attach Listeners to ELEMENT for start
+    timer.addEventListener('mousedown', onDragStart);
+    timer.addEventListener('touchstart', onDragStart, { passive: false });
 
-    timer.removeEventListener('touchstart', handleDragStart);
-    timer.addEventListener('touchstart', handleDragStart, { passive: false });
+    // Mark as initialized
+    timer.dataset.draggableInit = 'true';
+    console.log('✅ Timer Draggable Initialized:', timer);
+}
+
+
+// 3. Document Listeners for Move/End (Global)
+document.addEventListener('mousemove', onDragMove);
+document.addEventListener('touchmove', onDragMove, { passive: false });
+document.addEventListener('mouseup', onDragEnd);
+document.addEventListener('touchend', onDragEnd);
+
+
+// 4. Auto-Detect Timer (MutationObserver)
+// This watches for ANY timer appearing in the game container
+const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === 1) { // Element
+                // Check if node itself is timer
+                if (node.classList.contains('timer-display') || node.classList.contains('survival-timer')) {
+                    initDraggableElement(node);
+                }
+                // Check children
+                const timers = node.querySelectorAll('.timer-display, .survival-timer');
+                timers.forEach(initDraggableElement);
+            }
+        });
+    });
+});
+
+// Start observing body for changes (subtree)
+observer.observe(document.body, { childList: true, subtree: true });
+
+// Also check immediately in case run after load
+document.querySelectorAll('.timer-display, .survival-timer').forEach(initDraggableElement);
+
+
+// Legacy export hook (keeps compatibility)
+function setupDraggableTimer() {
+    document.querySelectorAll('.timer-display, .survival-timer').forEach(initDraggableElement);
 }
 
 console.log('🎮 Game Engine loaded with modes:', Object.keys(GAME_MODES).join(', '));
