@@ -1446,7 +1446,7 @@ document.addEventListener('touchend', onDragEnd);
 
 // 4. Auto-Detect Timer (MutationObserver)
 // This watches for ANY timer appearing in the game container
-const observer = new MutationObserver((mutations) => {
+const observerCallback = (mutations) => {
     mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1) { // Element
@@ -1460,14 +1460,28 @@ const observer = new MutationObserver((mutations) => {
             }
         });
     });
-});
+};
 
-// Start observing body for changes (subtree)
-observer.observe(document.body, { childList: true, subtree: true });
+const observer = new MutationObserver(observerCallback);
 
-// Also check immediately in case run after load
-document.querySelectorAll('.timer-display, .survival-timer').forEach(initDraggableElement);
+function startTimerObserver() {
+    if (document.body) {
+        // Start observing body for changes (subtree)
+        observer.observe(document.body, { childList: true, subtree: true });
+        // Also check immediately
+        document.querySelectorAll('.timer-display, .survival-timer').forEach(initDraggableElement);
+    } else {
+        // Retry if body not ready (unlikely but safe)
+        setTimeout(startTimerObserver, 100);
+    }
+}
 
+// Start watching when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startTimerObserver);
+} else {
+    startTimerObserver();
+}
 
 // Legacy export hook (keeps compatibility)
 function setupDraggableTimer() {
