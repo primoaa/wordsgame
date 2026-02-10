@@ -1,6 +1,6 @@
 /**
- * 🎮 تحدي الحروف - Game Controller
- * Handles Firebase integration and mode-specific game flow
+ * 🎮 تحدي الحروف - Game Controller (Professional Version)
+ * Handles Firebase integration and mode-specific game flow with strict state management.
  * 
  * 🔴 ABSOLUTE RULES:
  * - Must read room.mode, room.phases, room.phase before ANY logic
@@ -24,6 +24,7 @@ const GameState = {
     lastDisplayedRoundId: 0,
     lastDisplayedPhase: null,
     lastDisplayedMode: null,
+    lastStatus: null, // 🔴 Added for timer tracking
 
     // Mode-specific context
     modeContext: {}
@@ -32,18 +33,24 @@ const GameState = {
 // 🔴 Expose to window for index.html
 window.GameController = {
     state: GameState,
+    serverTimeOffset: 0,
     createRoom,
     joinRoom,
     startGame,
     listenToRoom,
     leaveRoom,
-    submitAnswers
+    submitAnswers,
+    playAgain,
+    acceptPlayAgain,
+    declinePlayAgain
 };
 
-// ==================== FIREBASE ====================
-// 🔴 Use window.database set by index.html to avoid duplicate declaration
-// The database is initialized in index.html's main script
+// Sync server time offset
+getDatabase().ref('.info/serverTimeOffset').on('value', snap => {
+    window.GameController.serverTimeOffset = snap.val() || 0;
+});
 
+// ==================== FIREBASE ====================
 function getDatabase() {
     return window.database || firebase.database();
 }
@@ -52,39 +59,24 @@ function getDatabase() {
 
 /**
  * Create a new room with specified mode
- * 🔴 Mode is REQUIRED - no default
  */
-async function createRoom(name, mode) {
-    // 🔴 CRITICAL: Mode must be provided
-    if (!mode) {
-        throw new Error('🔴 CRITICAL: mode must be specified');
-    }
+async function createRoom(name, mode, totalRounds = 5) {
+    if (!mode) throw new Error('🔴 CRITICAL: mode must be specified');
 
-    const { MODES, getRandomLetter, getRandomCategory } = window.GameEngine;
-
+    const { MODES } = window.GameEngine;
     const code = generateRoomCode();
-    // 🔴 reuse existing ID if set by index.html
-    if (!GameState.playerId) {
-        GameState.playerId = generatePlayerId();
-    }
+
+    if (!GameState.playerId) GameState.playerId = generatePlayerId();
     GameState.playerName = name;
     GameState.isHost = true;
     GameState.roundId = 0;
     GameState.phase = null;
     GameState.phaseIndex = 0;
 
-    // 🔴 CRITICAL: No fallback to classic
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: mode is undefined');
-    }
     const modeConfig = MODES[mode];
-    if (!modeConfig) {
-        throw new Error(`🔴 CRITICAL FAILURE: No configuration for mode "${mode}"`);
-    }
-    console.log(`🎮 Creating room with mode: ${mode}`, modeConfig);
+    if (!modeConfig) throw new Error(`🔴 CRITICAL FAILURE: No configuration for mode "${mode}"`);
 
-    // Build mode-specific context
-    const modeContext = buildModeContext(mode, modeConfig);
+    const modeContext = await buildModeContext(mode, modeConfig);
 
     await getDatabase().ref('rooms/' + code).set({
         code,
@@ -93,7 +85,6 @@ async function createRoom(name, mode) {
         modeName: modeConfig.name,
         letter: '',
         roundId: 0,
-        // 🔴 CRITICAL: These must exist before any logic runs
         phases: modeConfig.phases,
         phaseIndex: 0,
         totalPhases: modeConfig.phases.length,
@@ -103,94 +94,27 @@ async function createRoom(name, mode) {
         stoppedBy: '',
         stopLock: false,
         roundResults: null,
-        // 🔴 Mode-specific container - isolated per mode
+        currentRoundNumber: 1,
+        totalRounds: parseInt(totalRounds) || 5,
         modeContext: modeContext,
         players: {
             [GameState.playerId]: {
                 name,
                 isHost: true,
                 answers: {},
-                totalScore: 0,
-                eliminated: false, // For survival mode
-                streak: 0 // For survival mode
+                score: 0,
+                cumulativeScore: 0,
+                eliminated: false,
+                streak: 0,
+                status: 'online'
             }
         }
     });
 
     GameState.roomId = code;
     setupPresence();
-    listenToRoom(); // 🔴 ERROR 1 FIX: Start listener immediately
+    listenToRoom();
     return code;
-}
-
-/**
- * Build mode-specific context data
- */
-function buildModeContext(mode, modeConfig) {
-    const { CATEGORIES, getRandomLetter, getRandomCategory } = window.GameEngine;
-
-    switch (mode) {
-        case 'survival':
-            return {
-                currentCategory: getRandomCategory(),
-                roundNumber: 0,
-                eliminatedPlayers: []
-            };
-
-        case 'memory':
-            return {
-                words: generateMemoryWords(5),
-                showDuration: modeConfig.durations.show,
-                recallDuration: modeConfig.durations.recall
-            };
-
-        case 'bluff':
-            return {
-                category: getRandomCategory(),
-                anonymousAnswers: [],
-                votes: {},
-                liar: null // Set randomly when game starts
-            };
-
-        case 'objective':
-            return {
-                constraints: generateObjectiveConstraints()
-            };
-
-        default:
-            return {};
-    }
-}
-
-/**
- * Generate random words for memory mode
- */
-function generateMemoryWords(count) {
-    const wordBank = [
-        'أسد', 'نمر', 'فيل', 'زرافة', 'قرد',
-        'تفاح', 'موز', 'برتقال', 'عنب', 'رمان',
-        'طبيب', 'مهندس', 'معلم', 'طيار', 'شرطي',
-        'قمر', 'شمس', 'نجم', 'سماء', 'بحر',
-        'كتاب', 'قلم', 'ورقة', 'مكتب', 'كرسي'
-    ];
-
-    const shuffled = wordBank.sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
-}
-
-/**
- * Generate constraints for objective mode
- */
-function generateObjectiveConstraints() {
-    const letter = window.GameEngine.ARABIC_LETTERS[Math.floor(Math.random() * window.GameEngine.ARABIC_LETTERS.length)];
-    const containsLetter = window.GameEngine.ARABIC_LETTERS[Math.floor(Math.random() * window.GameEngine.ARABIC_LETTERS.length)];
-    const length = Math.floor(Math.random() * 3) + 3; // 3-5 letters
-
-    return [
-        { type: 'startsWith', value: letter, label: `يبدأ بحرف ${letter}` },
-        { type: 'contains', value: containsLetter, label: `يحتوي على حرف ${containsLetter}` },
-        { type: 'length', value: length, label: `من ${length} أحرف` }
-    ];
 }
 
 /**
@@ -201,13 +125,10 @@ async function joinRoom(code, name) {
     if (!snap.exists()) throw new Error('الغرفة غير موجودة');
 
     const room = snap.val();
-    if (room.status !== 'waiting') throw new Error('اللعبة بدأت');
+    if (room.status !== 'waiting') throw new Error('اللعبة بدأت بالفعل');
     if (Object.keys(room.players || {}).length >= 2) throw new Error('الغرفة ممتلئة');
 
-    // 🔴 reuse existing ID if set by index.html
-    if (!GameState.playerId) {
-        GameState.playerId = generatePlayerId();
-    }
+    if (!GameState.playerId) GameState.playerId = generatePlayerId();
     GameState.playerName = name;
     GameState.isHost = false;
     GameState.roundId = room.roundId || 0;
@@ -218,81 +139,24 @@ async function joinRoom(code, name) {
         name,
         isHost: false,
         answers: {},
-        totalScore: 0,
+        score: 0,
+        cumulativeScore: 0,
         eliminated: false,
-        streak: 0
+        streak: 0,
+        status: 'online'
     });
 
     GameState.roomId = code;
     setupPresence();
-    listenToRoom(); // 🔴 ERROR 1 & 5 FIX: Start listener to detect start
+    listenToRoom();
 }
 
 /**
- * Start the game (host only)
- * 🔴 ERROR 4 consolidated version
- */
-async function startGame() {
-    if (!GameState.roomId || !GameState.isHost) return;
-
-    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
-    const roomSnap = await roomRef.once('value');
-    if (!roomSnap.exists()) return;
-    const room = roomSnap.val();
-
-    const mode = room.mode;
-    const modeConfig = window.GameEngine.getModeConfig(mode);
-    const firstPhase = modeConfig.phases[0];
-
-    // 🔴 ERROR 9 FIX: Context must be refreshed per round if needed
-    // Calculate context BEFORE updating status to avoid race conditions
-    const modeContext = buildModeContext(mode, modeConfig);
-
-    // For bluff mode, randomly assign liar
-    if (mode === 'bluff') {
-        const playerIds = Object.keys(room.players || {});
-        modeContext.liar = playerIds[Math.floor(Math.random() * playerIds.length)];
-    }
-
-    // 🔴 CRITICAL: Prepare all updates including modeContext
-    const updates = {
-        status: 'playing',
-        letter: window.GameEngine.getRandomLetter(),
-        roundId: (room.roundId || 0) + 1,
-        phases: modeConfig.phases,
-        phaseIndex: 0,
-        totalPhases: modeConfig.phases.length,
-        phase: firstPhase,
-        phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
-        phaseDuration: modeConfig.durations[firstPhase] || 60,
-        stoppedBy: '',
-        stopLock: false,
-        roundResults: null,
-        modeContext: modeContext // 🔴 Ensure this is sent with status: playing
-    };
-
-    // Reset players
-    if (room.players) {
-        Object.keys(room.players).forEach(pid => {
-            updates[`players/${pid}/answers`] = null;
-            updates[`players/${pid}/eliminated`] = false;
-            updates[`players/${pid}/streak`] = 0;
-            // Clear previous mode props if needed
-        });
-    }
-
-    await roomRef.update(updates);
-}
-
-// ==================== GAME FLOW ====================
-
-/**
- * Main room listener
+ * Listen to room changes and sync state
  */
 function listenToRoom() {
     if (!GameState.roomId) return;
 
-    // Prevent duplicate listeners
     if (GameState.roomListener) {
         getDatabase().ref('rooms/' + GameState.roomId).off('value', GameState.roomListener);
     }
@@ -306,105 +170,112 @@ function listenToRoom() {
         }
 
         const room = snap.val();
+        const players = room.players || {};
+        const playerCount = Object.keys(players).length;
 
-        // 🔴 CRITICAL: Update global mode tracking
-        if (room.mode) {
-            window.currentMode = room.mode;
-        }
-
-        // 🔴 CRITICAL: Validate room state before any logic
-        const validation = window.GameEngine.validateRoomState(room);
-        if (!validation.valid && room.status === 'playing') {
-            console.error('🔴 CRITICAL: Invalid room state', validation.errors);
-            return;
-        }
-
-        const roomRoundId = room.roundId || 0;
-        const roomPhaseIndex = room.phaseIndex || 0;
-
-        // Update body data attribute for CSS
-        document.body.setAttribute('data-mode', room.mode);
-        document.body.setAttribute('data-phase', room.phase || '');
-
-        // Check for host transfer
-        const myPlayerData = room.players?.[GameState.playerId];
-        if (myPlayerData?.isHost && !GameState.isHost) {
+        // 🔴 HOST SYNC: Ensure there is always a host
+        const myPlayerData = players[GameState.playerId];
+        if (myPlayerData && myPlayerData.isHost && !GameState.isHost) {
             GameState.isHost = true;
             showToast('أصبحت المضيف الجديد! 👑');
         }
 
-        // New round detection
-        if (roomRoundId > GameState.roundId) {
-            GameState.roundId = roomRoundId;
-            GameState.phase = room.phase || null;
-            GameState.phaseIndex = 0;
+        // Update UI Elements
+        const countEl = document.getElementById('players-count');
+        if (countEl) countEl.textContent = `اللاعبون: ${playerCount}/2`;
+
+        // 🔴 Show manual start button for host
+        const startBtn = document.getElementById('force-start-btn');
+        if (startBtn) {
+            startBtn.style.display = (GameState.isHost && room.status === 'waiting') ? 'block' : 'none';
+        }
+
+        // 🔴 AUTO-START LOGIC (Professional)
+        // Only host triggers start when room is full and status is waiting
+        if (GameState.isHost && room.status === 'waiting' && playerCount >= 2) {
+            console.log("🚀 Room full, starting game...");
+            startGame();
+            return; // Exit to wait for next sync with 'playing' status
+        }
+
+        // Sync Phase & Round & Timer
+        const isNewRound = room.roundId > GameState.roundId;
+        const isPhaseChange = room.phase !== GameState.phase;
+        const isStatusToPlaying = room.status === 'playing' && GameState.lastStatus !== 'playing';
+
+        if (isNewRound) {
+            GameState.roundId = room.roundId;
             GameState.resultsShown = false;
         }
 
-        // Phase change within same round
-        if (roomPhaseIndex !== GameState.phaseIndex && room.status === 'playing') {
-            GameState.phaseIndex = roomPhaseIndex;
-            GameState.phase = room.phase || null;
-            if (GameState.timerInterval) {
-                clearInterval(GameState.timerInterval);
-                GameState.timerInterval = null;
-            }
-            const phaseConfig = window.GameEngine.getPhaseConfig(room.phase);
-            showToast(`🔄 مرحلة ${phaseConfig?.name || room.phase}`);
+        GameState.phase = room.phase;
+
+        // 🔴 FIX: Start timer if Phase OR Round OR Status changed to playing
+        if ((isPhaseChange || isNewRound || isStatusToPlaying) && room.status === 'playing' && room.phaseStartAt) {
+            console.log(`⏰ Starting Timer: Round=${room.roundId}, Phase=${room.phase}, Reason=${isNewRound ? 'NewRound' : (isPhaseChange ? 'PhaseChange' : 'StatusChange')}`);
+            startTimer(room.phaseStartAt, room.phaseDuration || 60, room);
         }
 
-        // Player count update
-        const count = Object.keys(room.players || {}).length;
-        const countEl = document.getElementById('players-count');
-        if (countEl) countEl.textContent = `اللاعبون: ${count}/2`;
+        GameState.lastStatus = room.status;
 
-        // Handle game states
+        // 🔴 Play Again Logic (Host & Guest)
+        if (room.playAgainRequest) {
+            const { status, requestedBy } = room.playAgainRequest;
+            const modal = document.getElementById('play-again-modal');
+
+            // Host: Handle Accepted/Declined
+            if (GameState.isHost) {
+                if (status === 'accepted') {
+                    // Only start if we haven't already (prevent double triggers)
+                    // We check if we are still in 'status: accepted' to trigger the round start
+                    // The startNewRound function will clear the request
+                    startNewRound(room);
+                } else if (status === 'declined') {
+                    showToast('اللاعب رفض اللعب مرة أخرى', 'error');
+                    getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).remove();
+                    // Reset button UI
+                    const btn = document.querySelector('#results-container button');
+                    if (btn) {
+                        btn.textContent = 'لعب مرة أخرى';
+                        btn.disabled = false;
+                        btn.classList.remove('btn-waiting');
+                    }
+                }
+            }
+
+            // Guest: Show Modal if Pending
+            if (!GameState.isHost && status === 'pending' && requestedBy !== GameState.playerId) {
+                if (modal) modal.classList.add('active');
+            } else {
+                if (modal) modal.classList.remove('active');
+            }
+        } else {
+            // No request active
+            const modal = document.getElementById('play-again-modal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        // 🔴 STATE MACHINE
         switch (room.status) {
             case 'waiting':
-                GameState.resultsShown = false;
-                showScreen('waiting'); // 🔴 Ensure waiting screen is shown
-                if (count === 2 && GameState.isHost) {
-                    setTimeout(() => startGame(), 1000);
-                }
+                showScreen('waiting');
                 break;
-
             case 'playing':
-                // 🔴 CRITICAL: Immediate switch for guest
                 showGameScreen(room);
                 break;
-
-            case 'finished':
-                if (!GameState.resultsShown) {
-                    GameState.resultsShown = true;
-                    await submitAnswers(room);
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                    const freshSnap = await getDatabase().ref('rooms/' + GameState.roomId).once('value');
-                    if (freshSnap.exists()) {
-                        await showResultsScreen(freshSnap.val());
-                    }
-                }
-                break;
-
             case 'calculating':
-                if (GameState.isHost) {
-                    const results = await calculateResults(room);
-                    await getDatabase().ref('rooms/' + GameState.roomId).update({
-                        roundResults: results,
-                        status: 'results'
-                    });
-                } else {
-                    // Guest shows loading state if needed, or wait for results
-                    const container = document.getElementById('results-container');
-                    if (container && document.getElementById('results-screen').classList.contains('active')) {
-                        container.innerHTML = '<div class="ai-loading"><p>جاري حساب النتائج...</p></div>';
-                    }
+                if (!GameState.isHost) {
+                    const container = document.getElementById('game-container');
+                    if (container) container.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>جاري حساب النتائج...</p></div>';
+                } else if (!room.roundResults) {
+                    handleHostCalculation(room);
                 }
                 break;
-
             case 'results':
+            case 'finished_game':
                 if (!GameState.resultsShown) {
                     GameState.resultsShown = true;
-                    await showResultsScreen(room);
+                    await showResultsScreen(room, room.status === 'finished_game');
                 }
                 break;
         }
@@ -412,972 +283,144 @@ function listenToRoom() {
 }
 
 /**
- * Show game screen based on current mode
- * 🔴 USES renderGameUI AS SINGLE ENTRY POINT
+ * Start the game (Host only)
  */
-function showGameScreen(room) {
-    showScreen('game');
-
-    // 🔴 CRITICAL: Validate mode exists
-    if (!room || !room.mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-
-    // Update state
-    GameState.phase = room.phase || null;
-    GameState.phaseIndex = room.phaseIndex || 0;
-
-    // Build UI on new round OR new phase (for modes like Memory/Bluff)
-    const roomRoundId = room.roundId || 0;
-    const currentPhase = room.phase;
-
-    // Check if full rebuild is needed
-    // 🔴 ERROR 3 & 8 FIX: Always rebuild if UI state is empty OR round/phase change
-    const needsRebuild =
-        !GameState.lastDisplayedMode ||
-        room.mode !== GameState.lastDisplayedMode ||
-        roomRoundId > GameState.lastDisplayedRoundId ||
-        currentPhase !== GameState.lastDisplayedPhase;
-
-    if (needsRebuild) {
-        GameState.lastDisplayedMode = room.mode;
-        GameState.lastDisplayedRoundId = roomRoundId;
-        GameState.lastDisplayedPhase = currentPhase;
-
-        console.log(`🎮 showGameScreen: Rebuilding UI for mode "${room.mode}" phase "${currentPhase}"`);
-
-        // 🔴 CRITICAL: Use SINGLE ENTRY POINT for UI
-        window.GameEngine.renderGameUI(room);
-
-        // 🔴 Setup mode-specific event handlers
-        setupModeEventHandlers(room);
-    }
-
-    // Update phase-specific elements
-    updatePhaseState(room);
-
-    // Start timer
-    if (!GameState.timerInterval && room.phaseStartAt) {
-        GameState.phaseStartAt = room.phaseStartAt;
-        startTimer(room.phaseStartAt, room.phaseDuration || 60, room);
-    }
-}
-
-/**
- * Setup mode-specific event handlers
- * 🔴 Uses GameEngine.setupModeHandler for strict isolation
- */
-function setupModeEventHandlers(room) {
-    const callbacks = {
-        // Classic & Multiphase
-        onStop: () => pressStop(room),
-
-        // Survival
-        onSubmit: () => submitSurvivalAnswer(room),
-
-        // Memory (onSubmit also used for Survival but context differs)
-        // Memory uses submitAnswers which is general but strict inside
-        onMemorySubmit: () => submitAnswers(room),
-
-        // Bluff
-        onVote: () => submitBluffVote(room),
-
-        // Objective
-        onObjectiveSubmit: () => checkObjectiveConstraints(room),
-        onInput: () => liveCheckConstraints(room)
-    };
-
-    // Map specific callbacks for generic handler names if needed
-    // GameEngine expects: onStop, onSubmit, onVote, onInput
-
-    // Create a mode-specific callback map
-    const modeCallbacks = {};
-    const mode = room.mode;
-
-    if (mode === 'memory') modeCallbacks.onSubmit = callbacks.onMemorySubmit;
-    else if (mode === 'objective') modeCallbacks.onSubmit = callbacks.onObjectiveSubmit;
-    else modeCallbacks.onSubmit = callbacks.onSubmit;
-
-    modeCallbacks.onStop = callbacks.onStop;
-    modeCallbacks.onVote = callbacks.onVote;
-    modeCallbacks.onInput = callbacks.onInput;
-
-    window.GameEngine.setupModeHandler(room, modeCallbacks);
-}
-
-/**
- * Handle Stop button press
- */
-async function pressStop(room) {
-    if (!GameState.isHost) return;
-
-    // Check lock or permission
-    const isAllowed = window.GameEngine.isStopAllowed(room);
-    if (!isAllowed || room.stopLock) return;
-
-    await getDatabase().ref('rooms/' + GameState.roomId).update({
-        status: 'calculating',
-        stoppedBy: GameState.playerName,
-        stopLock: true
-    });
-}
-
-
-
-/**
- * Update phase-specific state
- */
-function updatePhaseState(room) {
-    const stopBtn = document.getElementById('stop-btn');
-    if (!stopBtn) return;
-
-    const isStopAllowed = window.GameEngine.isStopAllowed(room);
-
-    if (!isStopAllowed) {
-        if (room.phase === 'speed') {
-            stopBtn.style.display = 'none';
-        } else {
-            stopBtn.style.display = 'block';
-            stopBtn.disabled = true;
-            stopBtn.classList.add('locked');
-        }
-    } else {
-        stopBtn.style.display = 'block';
-        stopBtn.disabled = false;
-        stopBtn.classList.remove('locked');
-    }
-}
-
-// ==================== MODE-SPECIFIC SUBMISSIONS ====================
-
-/**
- * Submit survival mode answer
- */
-async function submitSurvivalAnswer(room) {
-    const input = document.getElementById('survival-input');
-    if (!input) return;
-
-    const answer = input.value.trim();
-    const modeContext = room.modeContext || {};
-    const category = modeContext.currentCategory;
-
-    // 🔴 AI as instant judge - true/false only
-    const validator = window.GameEngine.AI_VALIDATORS['instant-judge'];
-    const result = await validator(answer, room.letter, room);
-
-    if (result.valid) {
-        // Correct - increment streak, next category
-        showToast('✅ صحيح!', 'success');
-        await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`).update({
-            streak: firebase.database.ServerValue.increment(1)
-        });
-
-        if (GameState.isHost) {
-            // Move to next category
-            const nextCategory = window.GameEngine.getRandomCategory();
-            await getDatabase().ref(`rooms/${GameState.roomId}/modeContext/currentCategory`).set(nextCategory);
-            await getDatabase().ref(`rooms/${GameState.roomId}/phaseStartAt`).set(firebase.database.ServerValue.TIMESTAMP);
-        }
-    } else {
-        // Wrong - eliminate player
-        showToast('❌ خطأ! خرجت من اللعبة', 'error');
-        await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/eliminated`).set(true);
-
-        // Check if game should end
-        checkSurvivalEnd(room);
-    }
-
-    input.value = '';
-}
-
-/**
- * Check if survival game should end
- */
-async function checkSurvivalEnd(room) {
-    const players = room.players || {};
-    const alivePlayers = Object.entries(players).filter(([id, p]) => !p.eliminated);
-
-    if (alivePlayers.length <= 1 && GameState.isHost) {
-        await getDatabase().ref(`rooms/${GameState.roomId}`).update({
-            status: 'calculating',
-            stoppedBy: alivePlayers.length === 1 ? alivePlayers[0][1].name : 'لا يوجد فائز'
-        });
-    }
-}
-
-/**
- * Submit bluff vote
- */
-async function submitBluffVote(room) {
-    const selectedVote = document.querySelector('input[name="bluff-vote"]:checked');
-    if (!selectedVote) {
-        showToast('اختر إجابة للتصويت عليها', 'error');
-        return;
-    }
-
-    await getDatabase().ref(`rooms/${GameState.roomId}/modeContext/votes/${GameState.playerId}`).set(parseInt(selectedVote.value));
-    showToast('تم التصويت!');
-}
-
-/**
- * Live check objective constraints
- */
-function liveCheckConstraints(room) {
-    const input = document.getElementById('objective-input');
-    if (!input) return;
-
-    const answer = input.value.trim();
-    const modeContext = room.modeContext || {};
-    const constraints = modeContext.constraints || [];
-
-    const validator = window.GameEngine.AI_VALIDATORS['constraint-validator'];
-    const { results } = validator(answer, constraints);
-
-    constraints.forEach(c => {
-        const statusEl = document.getElementById('constraint-' + c.type);
-        if (statusEl) {
-            if (results[c.type] === true) {
-                statusEl.textContent = '✅';
-                statusEl.className = 'constraint-status pass';
-            } else if (results[c.type] === false) {
-                statusEl.textContent = '❌';
-                statusEl.className = 'constraint-status fail';
-            } else {
-                statusEl.textContent = '❓';
-                statusEl.className = 'constraint-status';
-            }
-        }
-    });
-}
-
-/**
- * Check objective constraints on submit
- */
-async function checkObjectiveConstraints(room) {
-    const input = document.getElementById('objective-input');
-    if (!input) return;
-
-    const answer = input.value.trim();
-    const modeContext = room.modeContext || {};
-    const constraints = modeContext.constraints || [];
-
-    const validator = window.GameEngine.AI_VALIDATORS['constraint-validator'];
-    const { passed, results } = validator(answer, constraints);
-
-    await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/answers`).set({
-        answer,
-        passed,
-        results
-    });
-
-    if (passed) {
-        showToast('🎉 صحيح!', 'success');
-        // End game - player solved it
-        if (GameState.isHost) {
-            await getDatabase().ref(`rooms/${GameState.roomId}`).update({
-                status: 'finished',
-                stoppedBy: GameState.playerName
-            });
-        }
-    } else {
-        showToast('❌ لم تستوفِ جميع الشروط', 'error');
-    }
-}
-
-/**
- * Submit answers (generic)
- * 🔴 CRITICAL: No fallback to classic
- */
-async function submitAnswers(room) {
-    if (!GameState.roomId || !GameState.playerId) return;
-
-    const mode = room.mode;
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-    const uiBuilder = window.GameEngine.UI_BUILDERS[mode];
-    if (!uiBuilder) {
-        throw new Error(`🔴 CRITICAL FAILURE: No UI_BUILDER for mode "${mode}"`);
-    }
-
-    const answers = uiBuilder.getAnswers();
-    await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/answers`).set(answers);
-}
-
-/**
- * Press STOP button
- */
-async function pressStop(room) {
-    if (!GameState.roomId) return;
-
-    // 🔴 CRITICAL: Check if STOP is allowed
-    if (!window.GameEngine.isStopAllowed(room)) {
-        const phaseConfig = window.GameEngine.getPhaseConfig(room.phase);
-        showToast(`STOP غير متاح في مرحلة ${phaseConfig?.name || room.phase}`, 'error');
-        return;
-    }
-
-    // Anti-cheat: minimum 5 seconds before STOP
-    if (GameState.phaseStartAt > 0) {
-        const elapsed = (Date.now() - GameState.phaseStartAt) / 1000;
-        if (elapsed < 5) {
-            showToast('انتظر ' + Math.ceil(5 - elapsed) + ' ثواني', 'error');
-            return;
-        }
-    }
-
-    await submitAnswers(room);
-
-    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
-
-    try {
-        await roomRef.transaction((r) => {
-            if (!r) return r;
-            if (r.status !== 'playing' || r.stopLock) return;
-
-            r.status = 'finished';
-            r.stoppedBy = GameState.playerName;
-            r.stopLock = true;
-            return r;
-        });
-    } catch (e) {
-        // Someone else pressed STOP first
-    }
-}
-
-// ==================== TIMER ====================
-
-function startTimer(roundStartAt, duration, room) {
-    if (GameState.timerInterval) clearInterval(GameState.timerInterval);
-
-    const timerEl = document.getElementById('timer-value');
-    if (!timerEl) return;
-
-    function updateTimer() {
-        const now = Date.now();
-        const elapsed = Math.floor((now - roundStartAt) / 1000);
-        const remaining = Math.max(0, duration - elapsed);
-
-        timerEl.textContent = remaining;
-
-        // Color coding
-        if (remaining <= 10) timerEl.className = 'timer-value danger';
-        else if (remaining <= 20) timerEl.className = 'timer-value warning';
-        else timerEl.className = 'timer-value';
-
-        // Time up
-        if (remaining <= 0) {
-            clearInterval(GameState.timerInterval);
-            GameState.timerInterval = null;
-            handleTimeUp(room);
-        }
-    }
-
-    updateTimer();
-    GameState.timerInterval = setInterval(updateTimer, 1000);
-}
-
-async function handleTimeUp(room) {
-    await submitAnswers(room);
-
-    if (GameState.isHost) {
-        const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
-        const roomSnap = await roomRef.once('value');
-        const currentRoom = roomSnap.val();
-
-        if (!currentRoom || currentRoom.stopLock) return;
-
-        const phases = currentRoom.phases || ['accuracy'];
-        const currentIdx = currentRoom.phaseIndex || 0;
-        const isLastPhase = currentIdx >= phases.length - 1;
-
-        if (isLastPhase) {
-            await roomRef.transaction((r) => {
-                if (!r || r.stopLock) return r;
-                r.status = 'finished';
-                r.stoppedBy = 'انتهى الوقت';
-                r.stopLock = true;
-                return r;
-            });
-        } else {
-            await nextPhase(currentRoom);
-        }
-    }
-}
-
-async function nextPhase(room) {
+async function startGame() {
     if (!GameState.roomId || !GameState.isHost) return;
 
     const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
-
-    try {
-        await roomRef.transaction((r) => {
-            if (!r) return r;
-
-            const phases = r.phases || ['accuracy'];
-            const currentIdx = r.phaseIndex || 0;
-            const nextIdx = currentIdx + 1;
-
-            if (nextIdx >= phases.length) return r;
-
-            const nextPhaseName = phases[nextIdx];
-            // 🔴 CRITICAL: No fallback to classic
-            if (!r.mode) {
-                console.error('🔴 CRITICAL FAILURE: r.mode is undefined in transaction');
-                return r;
-            }
-            const modeConfig = window.GameEngine.MODES[r.mode];
-            if (!modeConfig) {
-                console.error(`🔴 CRITICAL FAILURE: No configuration for mode "${r.mode}"`);
-                return r;
-            }
-            const duration = modeConfig.durations[nextPhaseName] || 60;
-
-            r.phaseIndex = nextIdx;
-            r.phase = nextPhaseName;
-            r.phaseStartAt = firebase.database.ServerValue.TIMESTAMP;
-            r.phaseDuration = duration;
-            r.stopLock = false;
-
-            return r;
-        });
-    } catch (e) {
-        console.error('Error transitioning phase:', e);
-    }
-}
-
-// ==================== RESULTS ====================
-
-async function showResultsScreen(room) {
-    if (GameState.timerInterval) {
-        clearInterval(GameState.timerInterval);
-        GameState.timerInterval = null;
-    }
-
-    // 🔴 CRITICAL: No fallback
-    const mode = room.mode;
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-    const uiBuilder = window.GameEngine.UI_BUILDERS[mode];
-    if (!uiBuilder) {
-        throw new Error(`🔴 CRITICAL FAILURE: No UI_BUILDER for mode "${mode}"`);
-    }
-    uiBuilder.disableInputs();
-
-    showScreen('results');
-
-    const container = document.getElementById('results-container');
-    container.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>جاري التحقق من الإجابات...</p></div>';
-
-    let roundResults = room.roundResults;
-
-    // 🔴 Mode-specific result calculation
-    if (!roundResults && GameState.isHost) {
-        roundResults = await calculateResults(room);
-        await getDatabase().ref(`rooms/${GameState.roomId}/roundResults`).set(roundResults);
-        await getDatabase().ref(`rooms/${GameState.roomId}/status`).set('results');
-    } else if (!roundResults) {
-        // Wait for host's results
-        return new Promise((resolve) => {
-            const resultsListener = getDatabase().ref(`rooms/${GameState.roomId}/roundResults`).on('value', (snap) => {
-                if (snap.val()) {
-                    getDatabase().ref(`rooms/${GameState.roomId}/roundResults`).off('value', resultsListener);
-                    displayResults(room, snap.val());
-                    resolve();
-                }
-            });
-
-            setTimeout(() => {
-                getDatabase().ref(`rooms/${GameState.roomId}/roundResults`).off('value', resultsListener);
-                container.innerHTML = '<p>حدث خطأ في التحقق</p>';
-                resolve();
-            }, 30000);
-        });
-    }
-
-    displayResults(room, roundResults);
-}
-
-/**
- * Calculate results based on mode
- */
-async function calculateResults(room) {
-    // 🔴 CRITICAL: No fallback to classic
-    const mode = room.mode;
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-    const results = {};
-
-    switch (mode) {
-        case 'survival':
-            // Survival: Show elimination order and streaks
-            for (const [pid, pdata] of Object.entries(room.players || {})) {
-                results[pid] = {
-                    eliminated: pdata.eliminated,
-                    streak: pdata.streak || 0,
-                    score: pdata.eliminated ? 0 : (pdata.streak || 0) * 10
-                };
-            }
-            break;
-
-        case 'memory':
-            // Memory: Compare remembered words
-            const correctWords = room.modeContext?.words || [];
-            for (const [pid, pdata] of Object.entries(room.players || {})) {
-                const playerWords = pdata.answers?.words || [];
-                const validator = window.GameEngine.AI_VALIDATORS['string-compare'];
-                const memResult = validator(playerWords, correctWords);
-                results[pid] = {
-                    correct: memResult.correct,
-                    total: memResult.total,
-                    score: memResult.score
-                };
-            }
-            break;
-
-        case 'bluff':
-            // Bluff: Check votes and reveal liar
-            const liarId = room.modeContext?.liar;
-            const votes = room.modeContext?.votes || {};
-            for (const [pid, pdata] of Object.entries(room.players || {})) {
-                const votedCorrectly = Object.entries(votes).some(([voterId, voteIdx]) => {
-                    // Check if they voted for the liar
-                    // This is simplified - would need anonymous answer mapping
-                    return voterId === pid;
-                });
-                results[pid] = {
-                    answer: pdata.answers?.answer || '',
-                    wasLiar: pid === liarId,
-                    score: pid === liarId ? 0 : 10 // Simplified scoring
-                };
-            }
-            break;
-
-        case 'objective':
-            // Objective: Check constraint solutions
-            for (const [pid, pdata] of Object.entries(room.players || {})) {
-                results[pid] = {
-                    answer: pdata.answers?.answer || '',
-                    passed: pdata.answers?.passed || false,
-                    score: pdata.answers?.passed ? 50 : 0
-                };
-            }
-            break;
-
-        case 'classic':
-        case 'multiphase':
-            // Classic/Multiphase: Full category validation
-            const letter = room.letter;
-            for (const [pid, pdata] of Object.entries(room.players || {})) {
-                const { score, results: ansResults } = await window.GameEngine.AI_VALIDATORS.validator(pdata.answers || {}, letter, room);
-                results[pid] = { score, answers: ansResults };
-            }
-            break;
-
-        // 🔴 NO default - mode must be explicit
-    }
-
-    return results;
-}
-
-/**
- * Generic submit wrapper for modes that just need to save answers
- */
-async function submitAnswers(room) {
-    if (!room) return;
-    const uiBuilder = window.GameEngine.UI_BUILDERS[room.mode];
-    if (uiBuilder) {
-        let answers = uiBuilder.getAnswers();
-
-        // 🔴 ERROR 7 FIX: Clean data before sending to Firebase
-        if (!answers || typeof answers !== 'object') answers = {};
-
-        await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/answers`).set(answers);
-        showToast('تم الإرسال!');
-    }
-}
-
-/**
- * Handle Time Up signal
- * 🔴 Centralized logic for phase transitions and timeouts
- */
-async function handleTimeUp() {
-    console.log('⏰ Time Up!');
-
-    // 1. Submit current inputs
-    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
     const roomSnap = await roomRef.once('value');
-    if (!roomSnap.exists()) return;
     const room = roomSnap.val();
 
-    // Submit answers before transition
-    try {
-        const uiBuilder = window.GameEngine.UI_BUILDERS[room.mode];
-        if (uiBuilder) {
-            let answers = uiBuilder.getAnswers();
-            // Validate answers object
-            if (!answers || typeof answers !== 'object') answers = {};
+    const modeConfig = window.GameEngine.getModeConfig(room.mode);
+    const firstPhase = modeConfig.phases[0];
+    const modeContext = await buildModeContext(room.mode, modeConfig);
 
-            // 🔴 Use set to overwrite instead of update to avoid merging old data from prev rounds
-            await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/answers`).set(answers);
-        }
-    } catch (err) {
-        console.error('Error submitting answers in handleTimeUp:', err);
-        // Continue execution - failing to submit shouldn't block game flow
-    }
+    const updates = {
+        status: 'playing',
+        letter: window.GameEngine.getRandomLetter(),
+        roundId: 1,
+        currentRoundNumber: 1,
+        phase: firstPhase,
+        phaseIndex: 0,
+        phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
+        phaseDuration: modeConfig.durations[firstPhase] || 60,
+        modeContext: modeContext,
+        roundResults: null,
+        stopLock: false
+    };
 
-    // 2. Host handles transitions
-    if (!GameState.isHost) return;
+    // Reset player round data
+    Object.keys(room.players).forEach(pid => {
+        updates[`players/${pid}/answers`] = {};
+        updates[`players/${pid}/score`] = 0;
+        updates[`players/${pid}/cumulativeScore`] = 0;
+        updates[`players/${pid}/eliminated`] = false;
+        updates[`players/${pid}/streak`] = 0;
+    });
 
-    try {
-        await roomRef.transaction((r) => {
-            if (!r || r.stopLock) return r;
-
-            const mode = r.mode;
-            const phases = r.phases || [];
-            const currentIdx = r.phaseIndex || 0;
-            const currentPhase = r.phase;
-
-            // Mode-specific Phase End Logic
-            if (mode === 'bluff') {
-                if (currentPhase === 'answer') {
-                    const anonymousAnswers = [];
-                    Object.entries(r.players || {}).forEach(([pid, p]) => {
-                        const ans = p.answers?.answer;
-                        if (ans) anonymousAnswers.push({ text: ans, ownerId: pid });
-                    });
-                    // Shuffle
-                    for (let i = anonymousAnswers.length - 1; i > 0; i--) {
-                        const j = Math.floor(Math.random() * (i + 1));
-                        [anonymousAnswers[i], anonymousAnswers[j]] = [anonymousAnswers[j], anonymousAnswers[i]];
-                    }
-                    if (!r.modeContext) r.modeContext = {};
-                    r.modeContext.anonymousAnswers = anonymousAnswers;
-                } else if (currentPhase === 'vote') {
-                    // Prepare Reveal Data
-                    const reveals = [];
-                    const letter = r.letter; // Basic sync validation
-                    const ann = r.modeContext.anonymousAnswers || [];
-
-                    ann.forEach(a => {
-                        const pName = r.players && r.players[a.ownerId] ? r.players[a.ownerId].name : '???';
-                        const text = a.text || '';
-                        // Simple sync validation: just check first letter match
-                        // This is "Is it a lie?" metric locally
-                        const valid = text.length >= 1 && text.charAt(0) === letter;
-                        reveals.push({
-                            playerName: pName,
-                            answer: text,
-                            wasLying: !valid
-                        });
-                    });
-                    r.modeContext.reveals = reveals;
-                }
-            }
-
-            const isLastPhase = currentIdx >= phases.length - 1;
-
-            if (isLastPhase) {
-                r.status = 'calculating';
-                r.stoppedBy = 'انتهى الوقت';
-                r.stopLock = true;
-            } else {
-                const nextIdx = currentIdx + 1;
-                const nextPhaseName = phases[nextIdx];
-                const modeConfig = window.GameEngine.getModeConfig(mode);
-                const duration = modeConfig.durations[nextPhaseName] || 60;
-
-                r.phaseIndex = nextIdx;
-                r.phase = nextPhaseName;
-                r.phaseStartAt = firebase.database.ServerValue.TIMESTAMP;
-                r.phaseDuration = duration;
-                r.stopLock = false;
-            }
-
-            return r;
-        });
-    } catch (e) {
-        console.error('🔴 Transaction Failed in handleTimeUp:', e);
-    }
+    await roomRef.update(updates);
 }
 
 /**
- * Display results based on mode
+ * Play Again (Host only) - Initiates Request
  */
-function displayResults(room, roundResults) {
-    const mode = room.mode;
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-    const container = document.getElementById('results-container');
+async function playAgain() {
+    if (!GameState.roomId || !GameState.isHost) return;
 
-    switch (mode) {
-        case 'classic':
-            displayClassicResults(container, room, roundResults);
-            break;
-        case 'multiphase':
-            displayMultiphaseResults(container, room, roundResults);
-            break;
-        case 'survival':
-            displaySurvivalResults(container, room, roundResults);
-            break;
-        case 'memory':
-            displayMemoryResults(container, room, roundResults);
-            break;
-        case 'bluff':
-            displayBluffResults(container, room, roundResults);
-            break;
-        case 'objective':
-            displayObjectiveResults(container, room, roundResults);
-            break;
-    }
+    // Set request to pending
+    await getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).set({
+        requestedBy: GameState.playerId,
+        status: 'pending',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+    });
 
-    // Add Play Again button for Host
-    if (GameState.isHost) {
-        const actionDiv = document.createElement('div');
-        actionDiv.className = 'results-actions';
-        actionDiv.style.marginTop = '20px';
-        actionDiv.innerHTML = `
-            <button class="btn btn-primary" onclick="window.GameController.playAgain()">
-                🔄 لعب مجدداً
-            </button>
-        `;
-        container.appendChild(actionDiv);
+    // UI Feedback for Host
+    const btn = document.querySelector('#results-container button');
+    if (btn) {
+        btn.textContent = 'بانتظار رد اللاعب...';
+        btn.disabled = true;
+        btn.classList.add('btn-waiting');
     }
 }
 
-// Mode-specific result displays
-function displaySurvivalResults(container, room, results) {
-    const players = Object.entries(room.players || {}).map(([id, p]) => ({
-        id, name: p.name, ...results[id], isMe: id === GameState.playerId
-    })).sort((a, b) => b.streak - a.streak);
-
-    const winner = players.find(p => !p.eliminated);
-
-    document.getElementById('winner-banner').textContent = winner
-        ? `🏆 الفائز: ${winner.name} (سلسلة ${winner.streak})`
-        : '💀 الجميع خرجوا!';
-
-    container.innerHTML = `
-        <div class="survival-results">
-            ${players.map(p => `
-                <div class="elimination-card ${p.eliminated ? 'dead' : 'alive'}">
-                    <span>${p.eliminated ? '💀' : '❤️'}</span>
-                    <span class="player-name">${p.name}</span>
-                    <span class="streak">🔥 ${p.streak}</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
+async function acceptPlayAgain() {
+    if (!GameState.roomId) return;
+    await getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).update({
+        status: 'accepted'
+    });
+    // Hide modal immediately for better UX
+    document.getElementById('play-again-modal').classList.remove('active');
 }
 
-function displayMemoryResults(container, room, results) {
-    const players = Object.entries(room.players || {}).map(([id, p]) => ({
-        id, name: p.name, ...results[id], isMe: id === GameState.playerId
-    })).sort((a, b) => b.score - a.score);
-
-    const maxScore = Math.max(...players.map(p => p.score));
-    const winners = players.filter(p => p.score === maxScore);
-
-    document.getElementById('winner-banner').textContent = winners.length === 1
-        ? `🧠 الفائز: ${winners[0].name} (${winners[0].correct}/${winners[0].total})`
-        : '🤝 تعادل!';
-
-    container.innerHTML = `
-        <div class="memory-results">
-            ${players.map(p => `
-                <div class="memory-result-card ${p.isMe ? 'me' : ''}">
-                    <div class="player-name">${p.name}</div>
-                    <div class="memory-score">${p.correct}/${p.total} كلمات</div>
-                    <div class="points">${p.score} نقطة</div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+async function declinePlayAgain() {
+    if (!GameState.roomId) return;
+    await getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).update({
+        status: 'declined'
+    });
+    document.getElementById('play-again-modal').classList.remove('active');
 }
 
-function displayBluffResults(container, room, results) {
-    const players = Object.entries(room.players || {}).map(([id, p]) => ({
-        id, name: p.name, ...results[id], isMe: id === GameState.playerId
-    }));
+/**
+ * Start New Round (Internal Logic)
+ * Triggered when Host sees 'accepted' status
+ */
+async function startNewRound(room) {
+    if (!GameState.roomId || !GameState.isHost) return;
 
-    const liar = players.find(p => p.wasLiar);
+    // Avoid re-triggering if we are already shifting to playing or cleared request
+    if (room.status === 'playing' && !room.playAgainRequest) return;
 
-    document.getElementById('winner-banner').textContent = `🎭 الكاذب كان: ${liar?.name || 'مجهول'}`;
+    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
+    const modeConfig = window.GameEngine.getModeConfig(room.mode);
+    const firstPhase = modeConfig.phases[0];
+    const modeContext = await buildModeContext(room.mode, modeConfig);
 
-    container.innerHTML = `
-        <div class="bluff-results">
-            ${players.map(p => `
-                <div class="reveal-card ${p.wasLiar ? 'liar' : 'honest'}">
-                    <div class="reveal-player">${p.name}</div>
-                    <div class="reveal-answer">${p.answer}</div>
-                    <div class="reveal-status">${p.wasLiar ? '🤥 كاذب' : '😇 صادق'}</div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    const updates = {
+        status: 'playing',
+        letter: window.GameEngine.getRandomLetter(),
+        roundId: (room.roundId || 0) + 1,
+        currentRoundNumber: (room.currentRoundNumber || 0) + 1,
+        phase: firstPhase,
+        phaseIndex: 0,
+        phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
+        phaseDuration: modeConfig.durations[firstPhase] || 60,
+        modeContext: modeContext,
+        roundResults: null,
+        stopLock: false,
+        playAgainRequest: null // Clear the request
+    };
+
+    // Reset round-specific data but keep cumulativeScore
+    Object.keys(room.players).forEach(pid => {
+        updates[`players/${pid}/answers`] = {};
+        updates[`players/${pid}/score`] = 0;
+        updates[`players/${pid}/eliminated`] = false;
+        updates[`players/${pid}/streak`] = 0;
+    });
+
+    await roomRef.update(updates);
 }
 
-function displayObjectiveResults(container, room, results) {
-    const players = Object.entries(room.players || {}).map(([id, p]) => ({
-        id, name: p.name, ...results[id], isMe: id === GameState.playerId
-    }));
-
-    const solver = players.find(p => p.passed);
-
-    document.getElementById('winner-banner').textContent = solver
-        ? `🧩 حلها: ${solver.name}`
-        : 'لم يحلها أحد!';
-
-    container.innerHTML = `
-        <div class="objective-results">
-            ${players.map(p => `
-                <div class="objective-result-card ${p.passed ? 'solved' : 'failed'}">
-                    <div class="player-name">${p.name}</div>
-                    <div class="answer">${p.answer || '-'}</div>
-                    <div class="status">${p.passed ? '✅ صحيح' : '❌ خطأ'}</div>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
-
-function displayClassicResults(container, room, roundResults) {
-    // ... existing classic results display logic
-    const CATEGORIES = window.GameEngine.CATEGORIES;
-    const results = [];
-
-    for (const [pid, pdata] of Object.entries(room.players || {})) {
-        const playerResults = roundResults?.[pid] || { score: 0, answers: {} };
-        results.push({
-            id: pid,
-            name: pdata.name,
-            score: playerResults.score,
-            answers: playerResults.answers,
-            isMe: pid === GameState.playerId
-        });
-    }
-
-    results.sort((a, b) => b.score - a.score);
-
-    const banner = document.getElementById('winner-banner');
-    if (results.length >= 2) {
-        if (results[0].score > results[1].score) {
-            banner.textContent = `🎉 الفائز: ${results[0].name} بـ ${results[0].score} نقطة!`;
-        } else if (results[0].score === results[1].score) {
-            banner.textContent = '🤝 تعادل!';
-        }
-    }
-
-    container.innerHTML = results.map(p => `
-        <div class="player-results" style="${p.isMe ? 'border-color:var(--accent-blue);' : ''}">
-            <div class="player-header">
-                <span class="player-name">${p.isMe ? '👤 ' : ''}${p.name}</span>
-                <span class="player-score">${p.score} نقطة</span>
-            </div>
-            <div class="answers-grid">
-                ${CATEGORIES.map(cat => {
-        const a = p.answers?.[cat.id] || { answer: '-', valid: false, points: 0 };
-        return `<div class="answer-item">
-                        <div class="answer-category">${cat.label}</div>
-                        <div class="answer-value ${a.valid ? 'correct' : 'wrong'}">${a.answer || '-'}</div>
-                        <div class="answer-points ${a.points > 0 ? 'positive' : ''}">${a.points > 0 ? '+10' : '0'}</div>
-                    </div>`;
-    }).join('')}
-            </div>
-        </div>
-    `).join('');
-
-    if (room.stoppedBy) showToast(`${room.stoppedBy} أنهى الجولة!`);
-}
-
-function displayMultiphaseResults(container, room, roundResults) {
-    // Multiphase uses same category structure as classic
-    // but with phase indicators
-    const CATEGORIES = window.GameEngine.CATEGORIES;
-    const results = [];
-
-    for (const [pid, pdata] of Object.entries(room.players || {})) {
-        const playerResults = roundResults?.[pid] || { score: 0, answers: {} };
-        results.push({
-            id: pid,
-            name: pdata.name,
-            score: playerResults.score,
-            answers: playerResults.answers,
-            isMe: pid === GameState.playerId
-        });
-    }
-
-    results.sort((a, b) => b.score - a.score);
-
-    const banner = document.getElementById('winner-banner');
-    if (results.length >= 2) {
-        if (results[0].score > results[1].score) {
-            banner.textContent = `⚡ الفائز: ${results[0].name} بـ ${results[0].score} نقطة!`;
-        } else if (results[0].score === results[1].score) {
-            banner.textContent = '🤝 تعادل!';
-        }
-    }
-
-    container.innerHTML = results.map(p => `
-        <div class="player-results multiphase-results" style="${p.isMe ? 'border-color:var(--accent-blue);' : ''}">
-            <div class="player-header">
-                <span class="player-name">${p.isMe ? '👤 ' : ''}${p.name}</span>
-                <span class="player-score">${p.score} نقطة</span>
-            </div>
-            <div class="answers-grid">
-                ${CATEGORIES.map(cat => {
-        const a = p.answers?.[cat.id] || { answer: '-', valid: false, points: 0 };
-        return `<div class="answer-item">
-                        <div class="answer-category">${cat.label}</div>
-                        <div class="answer-value ${a.valid ? 'correct' : 'wrong'}">${a.answer || '-'}</div>
-                        <div class="answer-points ${a.points > 0 ? 'positive' : ''}">${a.points > 0 ? '+10' : '0'}</div>
-                    </div>`;
-    }).join('')}
-            </div>
-        </div>
-    `).join('');
-}
-
-// ==================== HELPERS ====================
-
-function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    return code;
-}
-
-function generatePlayerId() {
-    return 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-}
-
+/**
+ * Handle Presence and Disconnection
+ */
 function setupPresence() {
     if (!GameState.roomId || !GameState.playerId) return;
+
     const playerRef = getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`);
-    playerRef.onDisconnect().remove();
+
+    playerRef.update({ status: 'online' });
+
+    // 🔴 CRITICAL: Clean up on disconnect to prevent ghost players
+    playerRef.onDisconnect().remove().then(() => {
+        // If host leaves, room logic in leaveRoom handles handover
+    });
 }
 
-function cleanup() {
-    if (GameState.timerInterval) {
-        clearInterval(GameState.timerInterval);
-        GameState.timerInterval = null;
-    }
-    if (GameState.roomListener && GameState.roomId) {
-        getDatabase().ref('rooms/' + GameState.roomId).off('value', GameState.roomListener);
-        GameState.roomListener = null;
-    }
-    GameState.roomId = null;
-    GameState.playerId = null;
-    GameState.isHost = false;
-    GameState.roundId = 0;
-    GameState.phase = null;
-    GameState.phaseStartAt = 0;
-    GameState.lastDisplayedRoundId = 0;
-}
-
+/**
+ * Leave Room
+ */
 async function leaveRoom() {
     if (!GameState.roomId || !GameState.playerId) {
         cleanup();
@@ -1387,128 +430,382 @@ async function leaveRoom() {
     const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
 
     try {
-        if (GameState.isHost) {
-            await roomRef.transaction((room) => {
-                if (!room) return room;
-                if (room.players?.[GameState.playerId]) {
-                    delete room.players[GameState.playerId];
+        const snap = await roomRef.once('value');
+        const room = snap.val();
+
+        if (room && room.players) {
+            const playerIds = Object.keys(room.players);
+            if (playerIds.length <= 1) {
+                // Last player leaves, delete room
+                await roomRef.remove();
+            } else {
+                // Handover host if needed
+                if (GameState.isHost) {
+                    const nextHostId = playerIds.find(id => id !== GameState.playerId);
+                    await roomRef.child(`players/${nextHostId}`).update({ isHost: true });
                 }
-                const remaining = Object.keys(room.players || {});
-                if (remaining.length === 0) {
-                    return null;
-                } else {
-                    room.players[remaining[0]].isHost = true;
-                    room.status = 'waiting';
-                    return room;
-                }
-            });
-        } else {
-            await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`).remove();
+                await roomRef.child(`players/${GameState.playerId}`).remove();
+            }
         }
-    } catch (e) { }
+    } catch (e) {
+        console.error("Error leaving room:", e);
+    }
 
     cleanup();
 }
 
-async function playAgain() {
-    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
-    const roomSnap = await roomRef.once('value');
-    const room = roomSnap.val();
+// ==================== UTILS & HELPERS ====================
 
-    if (!room) {
-        showToast('الغرفة غير موجودة', 'error');
-        return;
+function cleanup() {
+    if (GameState.timerInterval) clearInterval(GameState.timerInterval);
+    if (GameState.roomListener && GameState.roomId) {
+        getDatabase().ref('rooms/' + GameState.roomId).off('value', GameState.roomListener);
     }
-
-    // 🔴 CRITICAL: No fallback to classic
-    const mode = room.mode;
-    if (!mode) {
-        throw new Error('🔴 CRITICAL FAILURE: room.mode is undefined');
-    }
-    const modeConfig = window.GameEngine.MODES[mode];
-    if (!modeConfig) {
-        throw new Error(`🔴 CRITICAL FAILURE: No configuration for mode "${mode}"`);
-    }
-    const firstPhase = modeConfig.phases[0];
-    const duration = modeConfig.durations[firstPhase] || 60;
-
-    // Build fresh mode context
-    const modeContext = buildModeContext(mode, modeConfig);
-
-    try {
-        await roomRef.transaction((r) => {
-            if (!r) return r;
-
-            r.status = 'playing';
-            r.roundId = (r.roundId || 0) + 1;
-            r.letter = window.GameEngine.getRandomLetter();
-            r.phases = modeConfig.phases;
-            r.phaseIndex = 0;
-            r.totalPhases = modeConfig.phases.length;
-            r.phase = firstPhase;
-            r.phaseStartAt = firebase.database.ServerValue.TIMESTAMP;
-            r.phaseDuration = duration;
-            r.stoppedBy = '';
-            r.stopLock = false;
-            r.roundResults = null;
-            r.modeContext = modeContext;
-
-            for (const pid in r.players) {
-                r.players[pid].answers = {};
-                r.players[pid].eliminated = false;
-                r.players[pid].streak = 0;
-            }
-
-            return r;
-        });
-
-        GameState.resultsShown = false;
-    } catch (e) {
-        showToast('حدث خطأ', 'error');
-    }
-}
-
-// UI helpers
-function showScreen(name) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const screen = document.getElementById(name + '-screen');
-    if (screen) screen.classList.add('active');
-}
-
-function showToast(msg, type = 'success') {
-    const t = document.getElementById('toast');
-    if (t) {
-        t.textContent = msg;
-        t.className = `toast ${type} show`;
-        setTimeout(() => t.classList.remove('show'), 3000);
-    }
-}
-
-// ==================== HELPERS ====================
-
-function generatePlayerId() {
-    return 'player_' + Math.random().toString(36).substr(2, 9);
+    GameState.roomId = null;
+    GameState.isHost = false;
+    GameState.roomListener = null;
+    GameState.timerInterval = null;
+    GameState.lastRenderedKey = null;
 }
 
 function generateRoomCode() {
-    return Math.floor(1000 + Math.random() * 9000).toString();
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// ==================== EXPORTS ====================
+function generatePlayerId() {
+    return 'p_' + Math.random().toString(36).substring(2, 10);
+}
 
-window.GameController = {
-    state: GameState,
-    getDatabase,
-    createRoom,
-    joinRoom,
-    startGame,
-    listenToRoom,
-    leaveRoom,
-    playAgain,
-    showScreen,
-    showToast,
-    cleanup,
-    handleTimeUp
-};
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const target = document.getElementById(id + '-screen');
+    if (target) target.classList.add('active');
+}
 
-console.log('🎮 Game Controller loaded');
+function showToast(msg, type = 'info') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.className = `toast show ${type}`;
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+async function buildModeContext(mode, modeConfig) {
+    // Fallback static generation (Simplified for brevity, same as original logic)
+    const { getRandomCategory } = window.GameEngine;
+    switch (mode) {
+        case 'survival': return { currentCategory: getRandomCategory(), roundNumber: 0 };
+        case 'memory': return { words: ['أسد', 'نمر', 'فيل', 'زرافة', 'قرد'], showDuration: 5, recallDuration: 15 };
+        default: return {};
+    }
+}
+
+function startTimer(startAt, duration, room) {
+    if (GameState.timerInterval) clearInterval(GameState.timerInterval);
+
+    // 🔴 FIX: Move element query INSIDE output to handle UI rebuilds
+    const update = () => {
+        const timerEl = document.getElementById('timer-value'); // Query fresh every tick
+
+        // 🔴 Use server-synced time
+        const now = Date.now() + (window.GameController.serverTimeOffset || 0);
+        const elapsed = Math.floor((now - startAt) / 1000);
+        const remaining = Math.max(0, duration - elapsed);
+
+        if (timerEl) {
+            timerEl.textContent = remaining;
+
+            // Get parent container for floating styles
+            const timerContainer = timerEl.parentElement;
+            if (timerContainer && timerContainer.classList.contains('timer-display')) {
+                // Clear previous states
+                timerContainer.classList.remove('warning', 'danger');
+
+                // logic for Red Alarm (last 10s)
+                if (remaining <= 10) {
+                    timerContainer.classList.add('danger');
+                }
+                // logic for Warning (last 20s)
+                else if (remaining <= 20) {
+                    timerContainer.classList.add('warning');
+                }
+            }
+        }
+
+        if (remaining <= 0) {
+            clearInterval(GameState.timerInterval);
+            if (GameState.isHost) {
+                console.log("⏰ Time up! Transitioning...");
+                handleTimeUp();
+            }
+        }
+    };
+
+    GameState.timerInterval = setInterval(update, 1000);
+    update();
+}
+
+async function handleTimeUp() {
+    if (!GameState.isHost) return;
+    // Transition to next phase or calculation
+    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
+    const snap = await roomRef.once('value');
+    const room = snap.val();
+
+    if (room.status !== 'playing') return;
+
+    const nextIdx = (room.phaseIndex || 0) + 1;
+    if (nextIdx < room.phases.length) {
+        const nextPhase = room.phases[nextIdx];
+        const modeConfig = window.GameEngine.getModeConfig(room.mode);
+        await roomRef.update({
+            phase: nextPhase,
+            phaseIndex: nextIdx,
+            phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
+            phaseDuration: modeConfig.durations[nextPhase] || 60
+        });
+    } else {
+        await roomRef.update({ status: 'calculating' });
+    }
+}
+
+async function handleHostCalculation(room) {
+    if (!GameState.isHost) return;
+
+    const roomRef = getDatabase().ref('rooms/' + GameState.roomId);
+
+    // 1. Collect all answers
+    const players = room.players || {};
+    const playerIds = Object.keys(players);
+    const roundResults = {};
+
+    try {
+        // Prepare validation for each player
+        for (const pid of playerIds) {
+            const player = players[pid];
+            const answers = player.answers || {};
+
+            // 🔴 Use the REAL AI Validator from GameEngine
+            const validation = await window.GameEngine.AI_VALIDATORS.validator(answers, room.letter, room);
+
+            roundResults[pid] = {
+                name: player.name,
+                answers: validation.results,
+                score: validation.score,
+                cumulativeScore: (player.cumulativeScore || 0) + validation.score
+            };
+
+            // Update player's cumulative score in DB for persistence
+            await roomRef.child(`players/${pid}`).update({
+                cumulativeScore: roundResults[pid].cumulativeScore,
+                score: validation.score
+            });
+        }
+
+        // 2. Finalize round
+        const isLastRound = room.currentRoundNumber >= room.totalRounds;
+        await roomRef.update({
+            roundResults: roundResults,
+            status: isLastRound ? 'finished_game' : 'results'
+        });
+
+    } catch (e) {
+        console.error('Calculation Error:', e);
+        showToast('حدث خطأ في الحساب، تم الانتقال للنتائج', 'error');
+
+        try {
+            // 🔴 FIX: Ensure we always exit 'calculating' state
+            // Use whatever results we have or empty object
+            const isLastRound = room.currentRoundNumber >= room.totalRounds;
+            await roomRef.update({
+                roundResults: roundResults || {},
+                status: isLastRound ? 'finished_game' : 'results'
+            });
+        } catch (updateError) {
+            console.error('CRITICAL: Failed to recover from calculation error', updateError);
+        }
+    }
+}
+
+/**
+ * 🔴 SHOW GAME SCREEN
+ * Handled transition from waiting -> playing
+ */
+function showGameScreen(room) {
+    // 🔴 SMART RENDER CHECK
+    // Only re-render if Mode, Round, Phase, or Letter changes
+    const currentKey = `${room.mode}_${room.roundId}_${room.phase}_${room.letter}`;
+
+    if (GameState.lastRenderedKey === currentKey) {
+        showScreen('game');
+        return; // UI is fresh, inputs preserved
+    }
+    GameState.lastRenderedKey = currentKey;
+
+    showScreen('game');
+
+    // 1. Render the Mode-Specific UI
+    // 1. Render the Mode-Specific UI
+    try {
+        const uiBuilder = window.GameEngine.renderGameUI(room);
+
+        // 🔴 SETUP MODE HANDLERS (Stop button, etc.)
+        window.GameEngine.setupModeHandler(room, {
+            onStop: () => {
+                // Handle Stop Button
+                // Sync final answers immediately before stopping?
+                // For now, just trigger end round via host or request stop
+                if (GameState.isHost) {
+                    // Host can stop immediately
+                    handleTimeUp();
+                } else {
+                    showToast('المضيف فقط يمكنه إيقاف اللعبة حالياً');
+                }
+            },
+            onSubmit: () => {
+                // For Survival/Memory modes
+            }
+        });
+
+        // 🔴 SETUP INPUT SYNC
+        // Sync answers to Firebase as user types
+        const inputs = document.getElementById('game-container').querySelectorAll('input, textarea');
+        let debounceTimer;
+
+        const syncAnswers = () => {
+            const answers = uiBuilder.getAnswers();
+            // Optimistic local update
+            GameState.answers = answers;
+
+            // Sync to Firebase
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                const playerRef = getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`);
+                playerRef.update({ answers: answers });
+            }, 300);
+        };
+
+        inputs.forEach(input => {
+            input.addEventListener('input', syncAnswers);
+            input.addEventListener('change', syncAnswers);
+        });
+
+    } catch (e) {
+        console.error("Failed to render game UI:", e);
+        showToast("فشل في تحميل واجهة اللعبة", "error");
+    }
+
+    // 3. Update common elements
+    // Timer is handled by startTimer separately
+}
+
+/**
+ * Render a beautiful results table
+ */
+async function showResultsScreen(room, isFinal) {
+    showScreen('results');
+    const container = document.getElementById('results-container');
+    if (!container) return;
+
+    const results = room.roundResults || {};
+    const playerIds = Object.keys(results);
+
+    // Find winner
+    let winnerId = null;
+    let maxTotal = -1;
+    playerIds.forEach(pid => {
+        if (results[pid].cumulativeScore > maxTotal) {
+            maxTotal = results[pid].cumulativeScore;
+            winnerId = pid;
+        }
+    });
+
+    let html = `
+        <div class="results-header">
+            <h3>${isFinal ? '🏆 النتائج النهائية' : '📊 نتائج الجولة'}</h3>
+        </div>
+        <div class="results-table-wrapper">
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>اللاعب</th>
+                        <th>اسم ولد</th>
+                        <th>اسم بنت</th>
+                        <th>خضار</th>
+                        <th>فواكه</th>
+                        <th>جماد</th>
+                        <th>حيوان</th>
+                        <th>بلاد</th>
+                        <th>مدينة</th>
+                        <th>مهنة</th>
+                        <th>النقاط</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    playerIds.forEach(pid => {
+        const res = results[pid];
+        const answers = res.answers || {};
+
+        html += `
+            <tr class="${pid === GameState.playerId ? 'is-me' : ''} ${isFinal && pid === winnerId ? 'winner-row' : ''}">
+                <td class="player-name-cell">
+                    ${res.name} 
+                    ${isFinal && pid === winnerId ? '<span class="winner-crown">👑</span>' : ''}
+                </td>
+                ${['boyName', 'girlName', 'vegetable', 'fruit', 'object', 'animal', 'country', 'city', 'job'].map(catId => {
+            const ansData = answers[catId] || { answer: '-', valid: false };
+            return `<td class="${ansData.valid ? 'valid-ans' : 'invalid-ans'}" title="${catId}">
+                        ${ansData.answer || '-'}
+                    </td>`;
+        }).join('')}
+                <td class="total-score-cell">${res.score}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="results-summary">
+            ${playerIds.map(pid => `
+                <div class="summary-card">
+                    <div class="summary-name">${results[pid].name}</div>
+                    <div class="summary-total">المجموع: ${results[pid].cumulativeScore}</div>
+                </div>
+            `).join('')}
+        </div>
+
+        <div class="results-actions">
+    `;
+
+    if (GameState.isHost) {
+        html += `<button class="btn btn-primary" onclick="window.GameController.playAgain()">
+            ${isFinal ? 'لعب من جديد 🔄' : 'الجولة التالية ⏭️'}
+        </button>`;
+    } else {
+        html += `<p class="waiting-text">بانتظار المضيف لبدء الجولة التالية...</p>`;
+    }
+
+    html += `
+            <button class="btn btn-secondary" onclick="window.GameController.leaveRoom()">خروج 🚪</button>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+async function submitAnswers() {
+    // Placeholder for UI-to-DB bridge
+    const roomSnap = await getDatabase().ref('rooms/' + GameState.roomId).once('value');
+    const room = roomSnap.val();
+    const uiBuilder = window.GameEngine.UI_BUILDERS[room.mode];
+    if (uiBuilder) {
+        const answers = uiBuilder.getAnswers();
+        await getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}/answers`).set(answers);
+        showToast('تم إرسال الإجابة!');
+    }
+}

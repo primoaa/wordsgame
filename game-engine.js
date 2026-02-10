@@ -203,7 +203,7 @@ function validateRoomState(room) {
         if (!room.phases || !Array.isArray(room.phases)) {
             errors.push('room.phases is missing or invalid');
         }
-        if (room.phase === undefined) {
+        if (room.phase === undefined || room.phase === null) {
             errors.push('room.phase is missing');
         }
         if (room.phaseIndex === undefined) {
@@ -383,7 +383,7 @@ const UI_BUILDERS = {
 
     /**
      * Survival Mode UI - Single input, one category at a time
-     * ❌ NO Grid, NO STOP, NO Results Table
+     * 🔴 "No-Elimination" Version: Turn counter, Strike Indicators
      */
     survival: {
         buildGameUI(container, room, letter) {
@@ -391,17 +391,24 @@ const UI_BUILDERS = {
             const currentCategory = modeContext.currentCategory || CATEGORIES[0];
             const lives = modeContext.lives !== undefined ? modeContext.lives : 1;
             const streak = modeContext.streak || 0;
+            const currentTurn = room.currentRoundNumber || 1;
+            const totalTurns = room.totalRounds || 10;
+            const strikes = room.players?.[GameState.playerId]?.stats?.strikes || 0;
 
             container.innerHTML = `
                 <div class="survival-game">
                     <div class="survival-header">
+                        <div class="turn-counter">
+                            <span class="turn-label">جولة</span>
+                            <span class="turn-value">${currentTurn}/${totalTurns}</span>
+                        </div>
                         <div class="survival-timer">
                             <span class="timer-icon">⏱️</span>
                             <span class="timer-value" id="timer-value">7</span>
                         </div>
-                        <div class="survival-streak">
-                            <span class="streak-icon">🔥</span>
-                            <span class="streak-value">${streak}</span>
+                        <div class="survival-strikes">
+                            <span class="strike-icon">⚠️</span>
+                            <span class="strike-value">${strikes} أخطاء</span>
                         </div>
                     </div>
                     
@@ -414,6 +421,7 @@ const UI_BUILDERS = {
                         <div class="survival-category-card">
                             <div class="category-icon">${getCategoryIcon(currentCategory.id)}</div>
                             <div class="category-name">${currentCategory.label}</div>
+                            <div class="category-prompt">${currentCategory.prompt}</div>
                         </div>
                         
                         <div class="survival-input-container">
@@ -424,9 +432,7 @@ const UI_BUILDERS = {
                     </div>
                     
                     <div class="survival-status">
-                        <span class="lives-indicator ${lives === 0 ? 'eliminated' : ''}">
-                            ${lives > 0 ? '❤️ حي' : '💀 خارج'}
-                        </span>
+                        <span class="streak-indicator">🔥 سلسلة: ${streak}</span>
                     </div>
                 </div>
             `;
@@ -452,13 +458,15 @@ const UI_BUILDERS = {
 
     /**
      * Memory Mode UI - Cards with blur effect
-     * ❌ NO Grid, NO STOP, NO Categories
+     * 🔴 Features: Risk Button (Round 3+)
      */
     memory: {
         buildGameUI(container, room, letter) {
             const modeContext = room.modeContext || {};
             const phase = room.phase;
-            const wordsToRemember = modeContext.words || ['كلمة ١', 'كلمة ٢', 'كلمة ٣', 'كلمة ٤', 'كلمة ٥'];
+            const wordsToRemember = modeContext.words || [];
+            const roundNum = room.currentRoundNumber || 1;
+            const showRisk = roundNum >= 3;
 
             if (phase === 'show') {
                 container.innerHTML = `
@@ -506,9 +514,32 @@ const UI_BUILDERS = {
                             `).join('')}
                         </div>
                         
-                        <button class="btn btn-primary memory-submit" id="memory-submit">تأكيد</button>
+                        <div class="memory-actions">
+                            ${showRisk ? `
+                                <button class="btn btn-risk" id="memory-risk-btn" onclick="toggleRisk()">
+                                    ⚡ مجازفة (+2 نقاط / 0 إذا أخطأت)
+                                </button>
+                                <input type="hidden" id="risk-enabled" value="false">
+                            ` : ''}
+                            <button class="btn btn-primary memory-submit" id="memory-submit">تأكيد</button>
+                        </div>
                     </div>
                 `;
+
+                // Risk toggle logic
+                window.toggleRisk = function () {
+                    const btn = document.getElementById('memory-risk-btn');
+                    const input = document.getElementById('risk-enabled');
+                    if (input.value === 'false') {
+                        input.value = 'true';
+                        btn.classList.add('active');
+                        btn.innerHTML = '⚡ المجازفة مفعلة!';
+                    } else {
+                        input.value = 'false';
+                        btn.classList.remove('active');
+                        btn.innerHTML = '⚡ مجازفة (+2 نقاط / 0 إذا أخطأت)';
+                    }
+                };
             }
         },
 
@@ -522,11 +553,14 @@ const UI_BUILDERS = {
                 }
                 i++;
             }
-            return { words: answers };
+            const risk = document.getElementById('risk-enabled')?.value === 'true';
+            return { words: answers, risk: risk };
         },
 
         disableInputs() {
             document.querySelectorAll('.memory-input').forEach(inp => inp.disabled = true);
+            const riskBtn = document.getElementById('memory-risk-btn');
+            if (riskBtn) riskBtn.disabled = true;
         },
 
         clearInputs() {
@@ -535,18 +569,32 @@ const UI_BUILDERS = {
     },
 
     /**
-     * Bluff Mode UI - Anonymous answers + voting
-     * ❌ NO Grid, AI NEVER identifies liar
+     * Bluff Mode UI - 5 distinct rounds
+     * 🔴 Round Visuals & Context
      */
     bluff: {
         buildGameUI(container, room, letter) {
             const modeContext = room.modeContext || {};
             const phase = room.phase;
             const category = modeContext.category || CATEGORIES[0];
+            const roundNum = room.currentRoundNumber || 1;
+
+            // Round Titles
+            const roundTitles = ['كلاسيكي', 'مزدوج', 'عكسي', 'صامت', 'الفخ الأخير'];
+            const roundTitle = roundTitles[roundNum - 1] || 'كلاسيكي';
+            const multiplier = roundNum === 1 ? '1x' : (roundNum === 2 ? '1.5x' : (roundNum >= 3 ? roundNum - 1 + 'x' : '1x'));
+
+            const headerHTML = `
+                <div class="bluff-round-badge">
+                    <span class="round-name">${roundTitle}</span>
+                    <span class="round-mult">${multiplier}</span>
+                </div>
+            `;
 
             if (phase === 'answer') {
                 container.innerHTML = `
                     <div class="bluff-game bluff-answer-phase">
+                        ${headerHTML}
                         <div class="bluff-header">
                             <div class="phase-indicator">
                                 <span class="phase-icon">✍️</span>
@@ -561,10 +609,10 @@ const UI_BUILDERS = {
                             <div class="bluff-letter">الحرف: <strong>${letter}</strong></div>
                             <div class="bluff-category">${category.label}</div>
                             
-                            <div class="bluff-tip">💡 يمكنك الكذب!</div>
+                            <div class="bluff-tip">💡 ${roundNum === 3 ? 'اكتب إجابة غريبة لكن صحيحة!' : 'يمكنك الكذب!'}</div>
                             
                             <input type="text" class="bluff-input" id="bluff-input" 
-                                   placeholder="إجابتك (صادقة أو كاذبة)..." autocomplete="off">
+                                   placeholder="إجابتك..." autocomplete="off">
                         </div>
                     </div>
                 `;
@@ -572,6 +620,7 @@ const UI_BUILDERS = {
                 const answers = modeContext.anonymousAnswers || [];
                 container.innerHTML = `
                     <div class="bluff-game bluff-vote-phase">
+                        ${headerHTML}
                         <div class="bluff-header">
                             <div class="phase-indicator">
                                 <span class="phase-icon">🗳️</span>
@@ -588,7 +637,7 @@ const UI_BUILDERS = {
                                     <input type="radio" name="bluff-vote" id="vote-${i}" value="${i}">
                                     <label for="vote-${i}" class="bluff-answer-card">
                                         <span class="answer-text">${ans.text || ans}</span>
-                                        <span class="answer-player">لاعب ${i + 1}</span>
+                                        <span class="answer-player">لاعب ؟</span>
                                     </label>
                                 </div>
                             `).join('')}
@@ -601,6 +650,7 @@ const UI_BUILDERS = {
                 const reveals = modeContext.reveals || [];
                 container.innerHTML = `
                     <div class="bluff-game bluff-reveal-phase">
+                        ${headerHTML}
                         <div class="bluff-header">
                             <div class="phase-indicator">
                                 <span class="phase-icon">🎭</span>
@@ -825,40 +875,119 @@ const UI_BUILDERS = {
 
 // ==================== AI VALIDATORS BY ROLE ====================
 
+// ==================== AI HELPER ====================
+
+/**
+ * 🔴 Worker Validation Helper
+ * Sends { word, letter, mode } to the Cloudflare Worker
+ */
+async function validateWordWithWorker(word, letter, mode) {
+    if (!word || word.trim().length < 2) return { valid: false, source: 'local-short' };
+
+    // 🔴 FORCE LOCAL VALIDATION for Survival and Memory (as per checklist)
+    if (mode === 'survival' || mode === 'memory') {
+        return {
+            valid: validateLocal(word, letter),
+            source: 'local-forced'
+        };
+    }
+
+    // 1. Try Worker if configured
+    if (window.WORKER_URL) {
+        try {
+            const response = await fetch(window.WORKER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    word: word.trim(),
+                    letter: letter,
+                    mode: mode || 'classic'
+                })
+            });
+
+            if (!response.ok) throw new Error(`Worker status: ${response.status}`);
+
+            const data = await response.json();
+            return { valid: !!data.valid, source: 'worker' };
+        } catch (e) {
+            console.error(`⚠️ Worker validation failed for "${word}":`, e);
+        }
+    }
+
+    // 2. Fallback to Local Validation if Worker fails or missing
+    return {
+        valid: validateLocal(word, letter),
+        source: 'local-fallback'
+    };
+}
+
 const AI_VALIDATORS = {
     /**
-     * Classic validator - checks all categories
+     * Classic/Multiphase validator - Parallel validation via Worker
      */
     async validator(answers, letter, room) {
-        // Full category validation logic
-        return await validateAllCategories(answers, letter);
+        const mode = room.mode || 'classic';
+        console.log(`🕵️ [Validator] Validating ${Object.keys(answers).length} words for mode: ${mode}`);
+
+        // Create parallel validation promises
+        const entries = Object.entries(answers);
+        const promises = entries.map(async ([catId, word]) => {
+            const result = await validateWordWithWorker(word, letter, mode);
+            return {
+                catId,
+                word,
+                valid: result.valid
+            };
+        });
+
+        // Wait for all to complete
+        const resultsArray = await Promise.all(promises);
+
+        // Assemble results
+        const finalResults = {};
+        let totalScore = 0;
+
+        resultsArray.forEach(({ catId, word, valid }) => {
+            finalResults[catId] = {
+                answer: word,
+                valid: valid,
+                points: valid ? 10 : 0
+            };
+            if (valid) totalScore += 10;
+        });
+
+        return { score: totalScore, results: finalResults };
     },
 
     /**
-     * Instant judge for Survival - true/false only, no explanations
+     * Instant judge for Survival - Strict Start-Letter Check
      */
     async 'instant-judge'(answer, letter, room) {
-        const modeContext = room.modeContext || {};
-        const category = modeContext.currentCategory;
-        if (!category || !answer) return { valid: false };
+        if (!answer) return { valid: false };
+        const cleanAnswer = answer.trim();
+        // Check if Arabic
+        if (!/^[\u0600-\u06FF\s]+$/.test(cleanAnswer)) return { valid: false };
 
-        // Quick validation - starts with letter?
-        const firstLetter = getFirstLetter(answer);
-        if (firstLetter !== normalizeArabic(letter)) {
-            return { valid: false };
-        }
+        const first = getFirstLetter(cleanAnswer);
+        const target = normalizeArabic(letter);
 
-        // Simple category check (can be enhanced with AI)
+        // 🔴 Strict Local Check
+        if (first !== target) return { valid: false };
+
         return { valid: true };
     },
 
     /**
-     * String compare for Memory - exact match only
+     * String compare for Memory - Exact Match (Normalized)
      */
     'string-compare'(playerWords, correctWords) {
-        const matches = playerWords.filter(pw =>
-            correctWords.some(cw => cw.trim() === pw.trim())
-        );
+        // Normalize for better matching
+        const norm = w => w.trim().replace(/[إأآ]/g, 'ا').replace(/ة$/g, 'ه');
+        const pNorm = playerWords.map(norm);
+        const cNorm = correctWords.map(norm);
+
+        const matches = pNorm.filter(pw => cNorm.includes(pw));
+
         return {
             correct: matches.length,
             total: correctWords.length,
@@ -867,23 +996,24 @@ const AI_VALIDATORS = {
     },
 
     /**
-     * Word exists check for Bluff - NEVER identifies liar
+     * Word exists check for Bluff - "True/False" existence only
      */
     async 'word-exists-only'(answer, category) {
-        // Only check if word exists in language
-        // NEVER return who is lying
         const trimmed = answer.trim();
+        // Check for Arabic chars length >= 2
         return {
-            exists: trimmed.length >= 2 // Simplified check
+            exists: trimmed.length >= 2 && /[\u0600-\u06FF]/.test(trimmed)
         };
     },
 
     /**
-     * Constraint validator for Objective
+     * Constraint validator for Objective - Multi-rule check
      */
     'constraint-validator'(answer, constraints) {
         const results = {};
         const word = answer.trim();
+        if (!word) return { passed: false, results: {} };
+        const normWord = normalizeArabic(word);
 
         constraints.forEach(c => {
             switch (c.type) {
@@ -891,13 +1021,20 @@ const AI_VALIDATORS = {
                     results[c.type] = getFirstLetter(word) === normalizeArabic(c.value);
                     break;
                 case 'contains':
-                    results[c.type] = word.includes(c.value);
+                    // Normalize value for comparison
+                    results[c.type] = normWord.includes(normalizeArabic(c.value));
                     break;
                 case 'length':
-                    results[c.type] = word.length === c.value;
+                    results[c.type] = word.length === c.value; // Exact length
+                    break;
+                case 'minLength':
+                    results[c.type] = word.length >= c.value;
                     break;
                 case 'endsWith':
                     results[c.type] = word.endsWith(c.value);
+                    break;
+                case 'notContains': // "No 'A'"
+                    results[c.type] = !normWord.includes(normalizeArabic(c.value));
                     break;
             }
         });
@@ -910,6 +1047,7 @@ const AI_VALIDATORS = {
 // ==================== HELPER FUNCTIONS ====================
 
 function normalizeArabic(letter) {
+    if (!letter) return '';
     const map = { 'أ': 'ا', 'إ': 'ا', 'آ': 'ا', 'ة': 'ه', 'ى': 'ي' };
     return map[letter] || letter;
 }
@@ -917,8 +1055,19 @@ function normalizeArabic(letter) {
 function getFirstLetter(word) {
     if (!word || !word.trim()) return '';
     let w = word.trim();
+    // Regex to verify it is Arabic
+    if (!/[\u0600-\u06FF]/.test(w)) return ''; // Return empty if not Arabic
+
     if (w.startsWith('ال') && w.length > 2) w = w.substring(2);
     return normalizeArabic(w.charAt(0));
+}
+
+function validateLocal(answer, targetLetter) {
+    if (!answer || answer.length < 2) return false;
+    // Enforce Arabic script
+    if (!/[\u0600-\u06FF]/.test(answer)) return false;
+
+    return getFirstLetter(answer) === normalizeArabic(targetLetter);
 }
 
 function generatePhaseDots(current, total) {
@@ -938,7 +1087,9 @@ function getCategoryIcon(catId) {
 }
 
 function getRandomLetter() {
-    return ARABIC_LETTERS[Math.floor(Math.random() * ARABIC_LETTERS.length)];
+    // 🔴 FORCE ARABIC ONLY
+    const strictArabic = ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
+    return strictArabic[Math.floor(Math.random() * strictArabic.length)];
 }
 
 function getRandomCategory() {
@@ -954,11 +1105,11 @@ async function validateAllCategories(answers, letter) {
 
     const results = {};
     let totalScore = 0;
+    const arabicLetter = normalizeArabic(letter);
 
     CATEGORIES.forEach(cat => {
         const answer = answers[cat.id] || '';
-        const firstLetter = getFirstLetter(answer);
-        const isValid = firstLetter === normalizeArabic(letter) && answer.length >= 2;
+        const isValid = validateLocal(answer, arabicLetter);
         results[cat.id] = { answer, valid: isValid, points: isValid ? 10 : 0 };
         totalScore += isValid ? 10 : 0;
     });
@@ -1146,9 +1297,116 @@ window.GameEngine = {
     getRandomCategory,
     normalizeArabic,
     getFirstLetter,
+    validateWordWithWorker,
+    setupDraggableTimer,
     // 🔴 ENTRY POINTS
     renderGameUI,
     setupModeHandler
 };
+
+// ==================== DRAGGABLE TIMER LOGIC ====================
+
+function setupDraggableTimer() {
+    const timer = document.querySelector('.timer-display');
+    if (!timer) return;
+
+    // 1. Restore Position
+    const savedPos = localStorage.getItem('timerPos');
+    if (savedPos) {
+        try {
+            const { x, y } = JSON.parse(savedPos);
+            timer.style.left = x;
+            timer.style.top = y;
+            // Ensure no reset via CSS
+            timer.style.transform = 'none';
+        } catch (e) {
+            console.error('Error parsing timer position', e);
+        }
+    }
+
+    // 2. Style
+    timer.style.cursor = 'grab';
+    timer.style.touchAction = 'none'; // Prevent scrolling while dragging
+    timer.style.userSelect = 'none';
+
+    // 3. Variables
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    // 4. Mouse Down / Touch Start
+    const startDrag = (e) => {
+        // Allow clicking buttons inside if any (future proofing)
+        if (e.target.tagName === 'BUTTON') return;
+
+        isDragging = true;
+        timer.style.cursor = 'grabbing';
+        timer.style.transition = 'none'; // Disable transition for smooth drag
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        startX = clientX;
+        startY = clientY;
+
+        const rect = timer.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+
+        // Prevent default touch actions (scrolling)
+        if (e.type === 'touchstart') {
+            // e.preventDefault(); // Sometimes needed, but can block click
+        }
+    };
+
+    // 5. Mouse Move / Touch Move
+    const moveDrag = (e) => {
+        if (!isDragging) return;
+
+        e.preventDefault(); // Stop scrolling on mobile!
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+
+        let newLeft = initialLeft + deltaX;
+        let newTop = initialTop + deltaY;
+
+        // Constraints (Keep fully on screen)
+        const maxX = window.innerWidth - timer.offsetWidth;
+        const maxY = window.innerHeight - timer.offsetHeight;
+
+        newLeft = Math.max(0, Math.min(newLeft, maxX));
+        newTop = Math.max(0, Math.min(newTop, maxY));
+
+        timer.style.left = `${newLeft}px`;
+        timer.style.top = `${newTop}px`;
+    };
+
+    // 6. Mouse Up / Touch End
+    const endDrag = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        timer.style.cursor = 'grab';
+        timer.style.transition = 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // Restore bounce
+
+        // Save position
+        localStorage.setItem('timerPos', JSON.stringify({
+            x: timer.style.left,
+            y: timer.style.top
+        }));
+    };
+
+    // Add Listeners
+    timer.addEventListener('mousedown', startDrag);
+    timer.addEventListener('touchstart', startDrag, { passive: false });
+
+    document.addEventListener('mousemove', moveDrag);
+    document.addEventListener('touchmove', moveDrag, { passive: false });
+
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
+}
 
 console.log('🎮 Game Engine loaded with modes:', Object.keys(GAME_MODES).join(', '));
