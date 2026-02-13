@@ -270,10 +270,14 @@ function listenToRoom() {
                 showGameScreen(room);
                 break;
             case 'calculating':
-                if (!GameState.isHost) {
-                    const container = document.getElementById('game-container');
-                    if (container) container.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>جاري حساب النتائج...</p></div>';
-                } else if (!room.roundResults && !room.calculationLock) {
+                // 🔴 FIX: Show calculating screen for BOTH host and guest
+                showScreen('game');
+                const calcContainer = document.getElementById('game-container');
+                if (calcContainer) {
+                    calcContainer.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div><p>جاري التحقق و حساب النتائج...</p></div>';
+                }
+                // Host triggers calculation logic
+                if (GameState.isHost && !room.roundResults && !room.calculationLock) {
                     handleHostCalculation(room);
                 }
                 break;
@@ -302,9 +306,16 @@ async function startGame() {
     const firstPhase = modeConfig.phases[0];
     const modeContext = await buildModeContext(room.mode, modeConfig);
 
+    // 🔴 GUARD: Generate and validate Arabic letter
+    let letter = window.GameEngine.getRandomLetter();
+    if (!letter || !/^[\u0600-\u06FF]$/.test(letter)) {
+        console.error('🔴 Invalid letter in startGame, retrying...');
+        letter = window.GameEngine.getRandomLetter();
+    }
+
     const updates = {
         status: 'playing',
-        letter: window.GameEngine.getRandomLetter(),
+        letter: letter,
         roundId: Date.now(),
         phase: firstPhase,
         phaseIndex: 0,
@@ -393,6 +404,13 @@ async function startNewRound(room) {
     const firstPhase = modeConfig.phases[0];
     const modeContext = await buildModeContext(room.mode, modeConfig);
 
+    // 🔴 GUARD: Generate and validate Arabic letter
+    let letter = window.GameEngine.getRandomLetter();
+    if (!letter || !/^[\u0600-\u06FF]$/.test(letter)) {
+        console.error('🔴 Invalid letter in startNewRound, retrying...');
+        letter = window.GameEngine.getRandomLetter();
+    }
+
     const updates = {
         roundId: Date.now(),
         playerAnswers: {},
@@ -400,7 +418,7 @@ async function startNewRound(room) {
         roundScores: {},
         calculationLock: false,
         status: 'playing',
-        letter: window.GameEngine.getRandomLetter(),
+        letter: letter,
         phase: firstPhase,
         phaseIndex: 0,
         phaseStartAt: firebase.database.ServerValue.TIMESTAMP,
@@ -1353,12 +1371,17 @@ async function showResultsScreen(room, isFinal) {
         html += `</tbody></table></div>`;
     }
 
-    // Action Buttons
+    // Action Buttons - 🔴 FIX: Role-aware buttons
     html += `<div class="res-actions">`;
     if (isFinal) {
+        // Final game: both players can request to play again
         html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">🔄 لعب من جديد</button>`;
-    } else {
+    } else if (GameState.isHost) {
+        // Host: Show "Next Round" button
         html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">⏭️ الجولة التالية</button>`;
+    } else {
+        // Guest: Show waiting indicator (disabled)
+        html += `<button class="res-btn res-btn-primary" disabled style="opacity:0.6;cursor:default;">⏳ بانتظار المضيف</button>`;
     }
     html += `<button class="res-btn res-btn-secondary" onclick="window.GameController.leaveRoom()">🚪 خروج</button>`;
     html += `</div>`;

@@ -1087,9 +1087,15 @@ function getCategoryIcon(catId) {
 }
 
 function getRandomLetter() {
-    // 🔴 FORCE ARABIC ONLY
-    const strictArabic = ['ا', 'ب', 'ت', 'ث', 'ج', 'ح', 'خ', 'د', 'ذ', 'ر', 'ز', 'س', 'ش', 'ص', 'ض', 'ط', 'ظ', 'ع', 'غ', 'ف', 'ق', 'ك', 'ل', 'م', 'ن', 'ه', 'و', 'ي'];
-    return strictArabic[Math.floor(Math.random() * strictArabic.length)];
+    // 🔴 FORCE ARABIC ONLY - Use the constant, no duplicates
+    const letter = ARABIC_LETTERS[Math.floor(Math.random() * ARABIC_LETTERS.length)];
+
+    // 🔴 GUARD: Validate the letter is actually Arabic (Unicode range 0600-06FF)
+    if (!letter || !/^[\u0600-\u06FF]$/.test(letter)) {
+        console.error('🔴 Non-Arabic letter detected:', letter, '- falling back to ا');
+        return 'ا'; // Safe fallback
+    }
+    return letter;
 }
 
 function getRandomCategory() {
