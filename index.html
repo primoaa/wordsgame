@@ -2276,13 +2276,7 @@
 
         <!-- Results Screen -->
         <div id="results-screen" class="screen">
-            <h2 class="results-title">🏆 النتائج</h2>
-            <div class="winner-banner" id="winner-banner"></div>
             <div class="results-container" id="results-container"></div>
-            <div class="results-actions">
-                <button class="btn btn-primary" id="play-again-btn">🔄 جولة جديدة</button>
-                <button class="btn btn-secondary" id="exit-game-btn">🚪 الخروج</button>
-            </div>
         </div>
     </div>
     <div class="toast" id="toast"></div>
@@ -2729,7 +2723,9 @@ ${JSON.stringify(answers)}`;
         // The UI Builder creates the stop button, and GameEngine binds events. 
         // No manual binding needed here unless for global fallback.
 
-        document.getElementById('play-again-btn').onclick = async () => {
+        // Buttons are now dynamically created in showResultsScreen
+        const _playBtn = document.getElementById('play-again-btn');
+        if (_playBtn) _playBtn.onclick = async () => {
             if (window.GameController.playAgain) {
                 await window.GameController.playAgain();
             } else {
@@ -2737,7 +2733,8 @@ ${JSON.stringify(answers)}`;
             }
         };
 
-        document.getElementById('exit-game-btn').onclick = async () => {
+        const _exitBtn = document.getElementById('exit-game-btn');
+        if (_exitBtn) _exitBtn.onclick = async () => {
             await window.GameController.leaveRoom();
             syncGameState();
             showScreen('welcome');

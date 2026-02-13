@@ -391,8 +391,8 @@ const UI_BUILDERS = {
             const currentCategory = modeContext.currentCategory || CATEGORIES[0];
             const lives = modeContext.lives !== undefined ? modeContext.lives : 1;
             const streak = modeContext.streak || 0;
-            const currentTurn = room.currentRoundNumber || 1;
-            const totalTurns = room.totalRounds || 10;
+            const currentTurn = (room.roundsPlayed || 0) + 1;
+            const totalTurns = room.roundsToPlay || 10;
             const strikes = room.players?.[GameState.playerId]?.stats?.strikes || 0;
 
             container.innerHTML = `
@@ -465,7 +465,7 @@ const UI_BUILDERS = {
             const modeContext = room.modeContext || {};
             const phase = room.phase;
             const wordsToRemember = modeContext.words || [];
-            const roundNum = room.currentRoundNumber || 1;
+            const roundNum = (room.roundsPlayed || 0) + 1;
             const showRisk = roundNum >= 3;
 
             if (phase === 'show') {
@@ -577,7 +577,7 @@ const UI_BUILDERS = {
             const modeContext = room.modeContext || {};
             const phase = room.phase;
             const category = modeContext.category || CATEGORIES[0];
-            const roundNum = room.currentRoundNumber || 1;
+            const roundNum = (room.roundsPlayed || 0) + 1;
 
             // Round Titles
             const roundTitles = ['كلاسيكي', 'مزدوج', 'عكسي', 'صامت', 'الفخ الأخير'];
