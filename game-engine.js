@@ -613,37 +613,54 @@ const UI_BUILDERS = {
                             
                             <input type="text" class="bluff-input" id="bluff-input" 
                                    placeholder="إجابتك..." autocomplete="off">
+                                   
+                            <button class="btn btn-primary" id="bluff-submit-btn" style="margin-top: 15px; width: 100%;">إرسال الإجابة 🚀</button>
                         </div>
                     </div>
                 `;
             } else if (phase === 'vote') {
-                const answers = modeContext.anonymousAnswers || [];
+                // 🔴 SHOW OPPONENT'S ANSWER FOR VERIFICATION
+                // If 1v1, we find the answer that is NOT ours
+                const myId = window.GameController.state.playerId;
+                const playerAnswers = window.GameController.state.playerAnswers || {};
+
+                let opponentAnswer = null;
+                let opponentName = "المنافس";
+
+                // Find opponent
+                Object.keys(playerAnswers).forEach(pid => {
+                    if (pid !== myId) {
+                        opponentAnswer = playerAnswers[pid] ? playerAnswers[pid][category.id] : '';
+                    }
+                });
+
+                if (!opponentAnswer) opponentAnswer = "لم يجب...";
+
                 container.innerHTML = `
                     <div class="bluff-game bluff-vote-phase">
                         ${headerHTML}
                         <div class="bluff-header">
                             <div class="phase-indicator">
-                                <span class="phase-icon">🗳️</span>
-                                <span class="phase-name">من الكاذب؟</span>
+                                <span class="phase-icon">⚖️</span>
+                                <span class="phase-name">تحقق من الإجابة</span>
                             </div>
                             <div class="timer-display">
                                 <span class="timer-value" id="timer-value">15</span>
                             </div>
                         </div>
                         
-                        <div class="bluff-answers-list">
-                            ${answers.map((ans, i) => `
-                                <div class="bluff-answer-option" data-index="${i}">
-                                    <input type="radio" name="bluff-vote" id="vote-${i}" value="${i}">
-                                    <label for="vote-${i}" class="bluff-answer-card">
-                                        <span class="answer-text">${ans.text || ans}</span>
-                                        <span class="answer-player">لاعب ؟</span>
-                                    </label>
-                                </div>
-                            `).join('')}
+                        <div class="bluff-main" style="text-align:center;">
+                            <h3>هل إجابة المنافس صحيحة؟</h3>
+                            <div class="bluff-opponent-answer" style="background:rgba(255,255,255,0.1); padding:15px; border-radius:10px; margin:20px 0; font-size:1.5em; font-weight:bold;">
+                                ${opponentAnswer}
+                            </div>
+                            
+                            <div class="bluff-verification-buttons" style="display:flex; gap:15px; justify-content:center;">
+                                <button class="btn" id="vote-true-btn" style="background:#28a745; flex:1;">✅ صحيحة</button>
+                                <button class="btn" id="vote-false-btn" style="background:#dc3545; flex:1;">❌ خاطئة</button>
+                            </div>
+                            <input type="hidden" id="bluff-vote-input" value="">
                         </div>
-                        
-                        <button class="btn btn-primary bluff-vote-btn" id="bluff-vote-submit">تصويت</button>
                     </div>
                 `;
             } else {
@@ -674,11 +691,29 @@ const UI_BUILDERS = {
 
         getAnswers() {
             const input = document.getElementById('bluff-input');
-            const vote = document.querySelector('input[name="bluff-vote"]:checked');
-            return {
-                answer: input ? input.value.trim() : '',
-                vote: vote ? parseInt(vote.value) : null
-            };
+            const voteInput = document.getElementById('bluff-vote-input');
+            const voteRadio = document.querySelector('input[name="bluff-vote"]:checked');
+
+            const result = {};
+
+            // Only include answer if input exists
+            if (input) {
+                result.answer = input.value.trim();
+            }
+
+            // Only include vote if input/radio exists
+            if (voteInput && voteInput.value !== '') {
+                result.vote = parseInt(voteInput.value);
+            } else if (voteRadio) {
+                result.vote = parseInt(voteRadio.value);
+            } else if (document.getElementById('bluff-vote-input') || document.querySelector('input[name="bluff-vote"]')) {
+                // If elements exist but nothing selected, explicitly null? 
+                // Or just don't send? better to send null to clear if needed, 
+                // but for vote usually we start null.
+                // let's leave it undefined if not set
+            }
+
+            return result;
         },
 
         disableInputs() {
@@ -1187,10 +1222,51 @@ const MODE_HANDLERS = {
     /**
      * Bluff: Answer → Vote → Reveal
      */
+    /**
+     * Bluff: Answer → Vote → Reveal
+     */
     handleBluff(room, callbacks) {
-        const submitBtn = document.getElementById('bluff-vote-submit');
-        if (submitBtn && callbacks.onVote) {
-            submitBtn.onclick = callbacks.onVote;
+        // 1. Answer Phase: Submit Button
+        const answerSubmit = document.getElementById('bluff-submit-btn');
+        if (answerSubmit && callbacks.onSubmit) {
+            answerSubmit.onclick = () => {
+                const input = document.getElementById('bluff-input');
+                if (input && input.value.trim()) {
+                    // Trigger sync/submit
+                    callbacks.onSubmit();
+
+                    // UI Feedback
+                    answerSubmit.disabled = true;
+                    answerSubmit.innerHTML = '⏳ تم الإرسال، بانتظار المنافس...';
+                    input.disabled = true;
+                } else {
+                    // Optional: Toast "Please enter an answer"
+                }
+            };
+        }
+
+        // 2. Vote Phase: Verification Buttons
+        const trueBtn = document.getElementById('vote-true-btn');
+        const falseBtn = document.getElementById('vote-false-btn');
+        const voteInput = document.getElementById('bluff-vote-input');
+
+        if (trueBtn && falseBtn && voteInput && callbacks.onSubmit) {
+            const handleVote = (val) => {
+                voteInput.value = val; // Set hidden input
+
+                // Visual Feedback
+                trueBtn.style.opacity = val === '1' ? '1' : '0.3';
+                trueBtn.style.transform = val === '1' ? 'scale(1.1)' : 'scale(1)';
+
+                falseBtn.style.opacity = val === '0' ? '1' : '0.3';
+                falseBtn.style.transform = val === '0' ? 'scale(1.1)' : 'scale(1)';
+
+                // Trigger submit callback
+                callbacks.onSubmit();
+            };
+
+            trueBtn.onclick = () => handleVote('1');
+            falseBtn.onclick = () => handleVote('0');
         }
     },
 
