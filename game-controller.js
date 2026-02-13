@@ -228,33 +228,29 @@ function listenToRoom() {
 
         GameState.lastStatus = room.status;
 
-        // 🔴 Play Again Logic (Host & Guest)
+        // 🔴 Play Again Logic (Both Host & Guest can request)
         if (room.playAgainRequest) {
             const { status, requestedBy } = room.playAgainRequest;
             const modal = document.getElementById('play-again-modal');
 
-            // Host: Handle Accepted/Declined
-            if (GameState.isHost) {
-                if (status === 'accepted') {
-                    // Only start if we haven't already (prevent double triggers)
-                    // We check if we are still in 'status: accepted' to trigger the round start
-                    // The startNewRound function will clear the request
-                    startNewRound(room);
-                } else if (status === 'declined') {
-                    showToast('اللاعب رفض اللعب مرة أخرى', 'error');
-                    getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).remove();
-                    // Reset button UI
-                    const btn = document.querySelector('#results-container button');
-                    if (btn) {
-                        btn.textContent = 'لعب مرة أخرى';
-                        btn.disabled = false;
-                        btn.classList.remove('btn-waiting');
-                    }
+            // Host starts new round when accepted
+            if (GameState.isHost && status === 'accepted') {
+                startNewRound(room);
+            }
+
+            // Show declined message to whoever requested
+            if (status === 'declined' && requestedBy === GameState.playerId) {
+                showToast('اللاعب رفض اللعب مرة أخرى', 'error');
+                getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).remove();
+                const btn = document.querySelector('.res-btn-primary');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('btn-waiting');
                 }
             }
 
-            // Guest: Show Modal if Pending
-            if (!GameState.isHost && status === 'pending' && requestedBy !== GameState.playerId) {
+            // Show modal to the OTHER player (not the requester)
+            if (status === 'pending' && requestedBy !== GameState.playerId) {
                 if (modal) modal.classList.add('active');
             } else {
                 if (modal) modal.classList.remove('active');
@@ -339,7 +335,7 @@ async function startGame() {
  * Play Again (Host only) - Initiates Request
  */
 async function playAgain() {
-    if (!GameState.roomId || !GameState.isHost) return;
+    if (!GameState.roomId) return;
 
     // Set request to pending
     await getDatabase().ref(`rooms/${GameState.roomId}/playAgainRequest`).set({
@@ -348,8 +344,8 @@ async function playAgain() {
         timestamp: firebase.database.ServerValue.TIMESTAMP
     });
 
-    // UI Feedback for Host
-    const btn = document.querySelector('#results-container button');
+    // UI Feedback for requester
+    const btn = document.querySelector('.res-btn-primary');
     if (btn) {
         btn.textContent = 'بانتظار رد اللاعب...';
         btn.disabled = true;
@@ -474,6 +470,7 @@ async function leaveRoom() {
     }
 
     cleanup();
+    showScreen('welcome');
 }
 
 // ==================== UTILS & HELPERS ====================
@@ -1358,14 +1355,10 @@ async function showResultsScreen(room, isFinal) {
 
     // Action Buttons
     html += `<div class="res-actions">`;
-    if (GameState.isHost) {
-        if (isFinal) {
-            html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">🔄 لعب من جديد</button>`;
-        } else {
-            html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">⏭️ الجولة التالية</button>`;
-        }
+    if (isFinal) {
+        html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">🔄 لعب من جديد</button>`;
     } else {
-        html += `<div class="res-waiting-msg">⏳ بانتظار المضيف...</div>`;
+        html += `<button class="res-btn res-btn-primary" onclick="window.GameController.playAgain()">⏭️ الجولة التالية</button>`;
     }
     html += `<button class="res-btn res-btn-secondary" onclick="window.GameController.leaveRoom()">🚪 خروج</button>`;
     html += `</div>`;
