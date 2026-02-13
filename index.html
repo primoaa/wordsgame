@@ -2749,6 +2749,8 @@ ${JSON.stringify(answers)}`;
                 currentMode = window.GameController.state.mode || selectedMode;
             }
         }
+        // 🔴 FIX: Expose globally so game-controller.js can call it
+        window.syncGameState = syncGameState;
 
         // ==================== FRIENDS SYSTEM ====================
 
@@ -2913,6 +2915,9 @@ ${JSON.stringify(answers)}`;
 
         // إنشاء غرفة وإرسال دعوة في نفس الوقت
         async function createRoomAndInvite(friendId, friendName) {
+            // 🔴 FIX: Always sync state from GameController before checking
+            syncGameState();
+
             // منع الدعوات أثناء اللعب
             if (currentRoomId) {
                 showToast('لا يمكن إرسال دعوة أثناء اللعب', 'error');
@@ -3013,6 +3018,9 @@ ${JSON.stringify(answers)}`;
 
         // Send invite to friend (if already in a room)
         async function sendInviteToFriend(friendId, friendName) {
+            // 🔴 FIX: Always sync state from GameController before checking
+            syncGameState();
+
             if (!currentRoomId) {
                 // إنشاء غرفة وإرسال دعوة
                 await createRoomAndInvite(friendId, friendName);

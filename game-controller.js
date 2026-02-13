@@ -488,6 +488,8 @@ async function leaveRoom() {
     }
 
     cleanup();
+    // 🔴 FIX: Sync local state so currentRoomId is reset
+    if (typeof window.syncGameState === 'function') window.syncGameState();
     showScreen('welcome');
 }
 
