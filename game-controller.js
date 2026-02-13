@@ -858,7 +858,17 @@ function showGameScreen(room) {
                 });
             },
             onSubmit: () => {
-                // For Survival/Memory modes
+                // 🔴 Force Sync Immediately (e.g. Bluff Submit / Vote)
+                if (!uiBuilder || !uiBuilder.getAnswers) return;
+
+                const newAnswers = uiBuilder.getAnswers();
+                const merged = { ...GameState.answers, ...newAnswers };
+                GameState.answers = merged;
+
+                const playerRef = getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`);
+                playerRef.update({ answers: merged });
+
+                console.log('🚀 Force synced answers via onSubmit:', merged);
             }
         });
 
@@ -868,15 +878,20 @@ function showGameScreen(room) {
         let debounceTimer;
 
         const syncAnswers = () => {
-            const answers = uiBuilder.getAnswers();
+            if (!uiBuilder || !uiBuilder.getAnswers) return;
+
+            const newAnswers = uiBuilder.getAnswers();
+            // 🔴 MERGE to prevent overwriting (e.g. vote phase shouldn't wipe answer)
+            const merged = { ...GameState.answers, ...newAnswers };
+
             // Optimistic local update
-            GameState.answers = answers;
+            GameState.answers = merged;
 
             // Sync to Firebase
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
                 const playerRef = getDatabase().ref(`rooms/${GameState.roomId}/players/${GameState.playerId}`);
-                playerRef.update({ answers: answers });
+                playerRef.update({ answers: merged });
             }, 300);
         };
 
